@@ -1,7 +1,6 @@
 # yobemaG
 
-Gameboy spelled backwards because that makes about as much sense as my code. A crappy WIP Gameboy emulator. 
-A simple Gameboy emulator I'm trying to write.
+Gameboy spelled backwards because that makes about as much sense as my code. A crappy, simple, WIP Gameboy emulator I'm trying to write.
 I'm not even trying to make this cross platform right now, so don't even attempt to run this on a non Linux computer.
 
 ## Requirements
