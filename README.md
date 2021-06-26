@@ -2,7 +2,7 @@
 
 Gameboy spelled backwards because that makes about as much sense as my code. A crappy WIP Gameboy emulator. 
 A simple Gameboy emulator I'm trying to write.
-Im not even trying to make this cross platform right now, so don't even try on a non Linux computer.
+I'm not even trying to make this cross platform right now, so don't even attempt to run this on a non Linux computer.
 
 ## Requirements
 * Any modern 64 bit linux distribution (may work on 32 bit but not tested)
