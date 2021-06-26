@@ -46,41 +46,6 @@ uint8_t serialReadCallback(uint16_t address);
 
 Gameboy emulator(&joypadWriteCallback, &joypadReadCallback, &serialWriteCallback, &serialReadCallback);
 
-/*
-void audio_callback(void* user, Uint8* stream, int len) {
-    Cpu* cpu = (Cpu*)user;
-    if (!cpu)
-    {
-        for (int i = 0; i < len; i++)
-        {
-            stream[i] = 0;
-        }
-        return;
-    }
-    if (!cpu->apu)
-    {
-        for (int i = 0; i < len; i++)
-        {
-            stream[i] = 0;
-        }
-        return;
-    }
-    cpu->audio_frames_requested += len / 4; //I use this to know how much to run the cpu
-    SDL_AudioStreamGet(cpu->apu->audio_stream, stream, len); //copy audio buffer to audio output
-    
-    //if we've throttled the cpu for turbo, we need to trash extra samples
-    if (std::floor(cpu->GetThrottle()) > 1)
-    {
-        uint8_t* trash = new uint8_t[len];
-
-        for (int n = 0; n < std::floor(cpu->GetThrottle()) - 1; n++)
-            SDL_AudioStreamGet(cpu->apu->audio_stream, trash, len);
-
-        delete[] trash;
-    }
-}
-*/
-
 int main(int argc, char *argv[]) {
 	// Parse arguments
 	if (argc < 2) {
