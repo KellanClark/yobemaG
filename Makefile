@@ -1,4 +1,4 @@
-TARGET_EXEC ?= worst_gbemu
+TARGET_EXEC ?= yobemag
 
 BUILD_DIR ?= ./build
 SRC_DIRS ?= ./src

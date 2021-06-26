@@ -1,5 +1,6 @@
-# Worst Gameboy Emulator	
+# yobemaG
 
+Gameboy spelled backwards because that makes about as much sense as my code. A crappy WIP Gameboy emulator. 
 A simple Gameboy emulator I'm trying to write.
 Im not even trying to make this cross platform right now, so don't even try on a non Linux computer.
 
@@ -12,5 +13,4 @@ Compile using `make` and run the file in `build/` with the path of the rom as th
 Optional Arguments:
 * `--bootrom <file>` Use a file as the bootrom.
 * `--system <dmg, cgb>` Specify which CPU to use.
-eg. `worst_gbemu Tetris.gb --bootrom bootrom.bin`
- 
+eg. `yobemag Tetris.gb --bootrom bootrom.bin --no-cycle-accuracy`
