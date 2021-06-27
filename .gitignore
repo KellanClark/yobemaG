@@ -56,4 +56,3 @@ dkms.conf
 .vscode
 *.sav
 build/
-testroms/
