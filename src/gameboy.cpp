@@ -5,8 +5,11 @@ Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (
 	dmaCyclesLeft=dmaCountdown=undocumented1=undocumented2=undocumented3=undocumented4 = 0;
 }
 
-void Gameboy::cycle() {
+void Gameboy::cycleCpu() {
 	cpu.cycle();
+}
+
+void Gameboy::cycleSystem() {
 	timer.cycle();
 	for (int i = 0; i < 4; i++) {
 		apu.cycle(); // Not implemented

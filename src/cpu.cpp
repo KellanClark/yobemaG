@@ -7,24 +7,16 @@ GameboyCPU::GameboyCPU(Gameboy& bus_) : SM83(bus_) {
 	counter=interruptRequests=enabledInterrupts = 0; // Clear variables
 	stopped=halted = false;
 	interruptMasterEnable = false;
-	cycleAccurate = true;
 
 	return;
 }
 
 int GameboyCPU::cycle() {
-	// Wait until last instruction has finished (may be off)
-	if (counter)
-		counter--;
-	if (counter)
-		return 1;
-	
-	
 	if (bus.dmaCountdown == 2)
 		bus.dmaCountdown = 1;
 
 	uint8_t readyInterrupts = (interruptRequests & enabledInterrupts);
-	if (readyInterrupts && !mCycle) {
+	if (readyInterrupts) {
 		// Temporary HALT implementation
 		halted = false;
 
@@ -49,19 +41,22 @@ int GameboyCPU::cycle() {
 				interruptRequests &= ~16;
 			}
 			// Add delay
-			counter += 5;
+			bus.cycleSystem();
+			bus.cycleSystem();
+			bus.cycleSystem();
+			bus.cycleSystem();
+			bus.cycleSystem();
+			return 0;
 		}
 	}
 
-	if (stopped || halted)
-		return 2; // TODO: deal with stopped and halted states
-
-	// Fetch and execute opcode
-	if (cycleAccurate) {
-		executeOpcodeCA();
-	} else {
-		executeOpcode();
+	// TODO: Deal with stopped and halted states properly
+	if (halted || stopped) {
+		bus.cycleSystem();
+		return 1;
 	}
+
+	executeOpcode();
 
 	return 0;
 }

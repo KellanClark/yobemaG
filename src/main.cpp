@@ -7,12 +7,12 @@
 #define SCREEN_HEIGHT 144*4
 #define FPS 60
 
+bool argRomGiven;
 std::filesystem::path argRomFilePath;
 bool argBootromGiven;
 std::filesystem::path argBootromFilePath;
 bool argSystemGiven;
-bool argCycleAccuracyGiven;
-bool argCycleAccuracy;
+bool argConsoleLog;
 
 // I have no idea how this works. I found this piece of magic on the internet somewhere.
 constexpr auto cexprHash(const char *str, std::size_t v = 0) noexcept -> std::size_t {
@@ -52,41 +52,51 @@ int main(int argc, char *argv[]) {
 		printf("Not enough arguments.\n");
 		return -1;
 	}
-	argRomFilePath = argv[1];
+	argRomGiven = false;
 	argBootromGiven = false;
 	argSystemGiven = false;
-	argCycleAccuracyGiven = false;
-	if (argc > 2) {
-		for (int i = 2; i < argc; i++) {
-			switch (cexprHash(argv[i])) {
-			case cexprHash("--bootrom"):
-				if (argc == (++i)) {
-					printf("Not enough arguments for flag --bootrom\n");
-					return -1;
-				}
-				argBootromGiven = true;
-				argBootromFilePath = argv[i];
-				break;
-			case cexprHash("--system"):
-				if (argc == (i + 1)) {
-					printf("Not enough arguments for flag --system\n");
-					return -1;
-				}
-				//
-				break;
-			case cexprHash("--cycle-accurate"):
-				argCycleAccuracyGiven = true;
-				argCycleAccuracy = true;
-				break;
-			case cexprHash("--no-cycle-accuracy"):
-				argCycleAccuracyGiven = true;
-				argCycleAccuracy = false;
-				break;
-			default:
+	argConsoleLog = false;
+	for (int i = 1; i < argc; i++) {
+		switch (cexprHash(argv[i])) {
+		case cexprHash("--rom"):
+			if (argc == (++i)) {
+				printf("Not enough arguments for flag --rom\n");
+				return -1;
+			}
+			argRomGiven = true;
+			argRomFilePath = argv[i];
+			break;
+		case cexprHash("--bootrom"):
+			if (argc == (++i)) {
+				printf("Not enough arguments for flag --bootrom\n");
+				return -1;
+			}
+			argBootromGiven = true;
+			argBootromFilePath = argv[i];
+			break;
+		case cexprHash("--system"):
+			if (argc == (i + 1)) {
+				printf("Not enough arguments for flag --system\n");
+				return -1;
+			}
+			//
+			break;
+		case cexprHash("--log-to-console"):
+			argConsoleLog = true;
+			break;
+		default:
+			if (i == 1) {
+				argRomGiven = true;
+				argRomFilePath = argv[i];
+			} else {
 				printf("Unknown argument:  %s\n", argv[i]);
 				return -1;
 			}
 		}
+	}
+	if (!argRomGiven) {
+		printf("No ROM given.");
+		return -1;
 	}
 
 	// Load cartridge and print info
@@ -111,9 +121,7 @@ int main(int argc, char *argv[]) {
 	printf("External RAM Size:  %d\n", emulator.rom.extRAMBanks * 8 * 1024);
 
 	// Pass remaining arguments to system
-	//if (argSystemGiven)
-	if (argCycleAccuracyGiven)
-		emulator.cpu.cycleAccurate = argCycleAccuracy;
+	//if (argSystemGiven) emulator.system = ;
 
 	// Initalize some values
 	serialData = 0;
@@ -131,7 +139,7 @@ int main(int argc, char *argv[]) {
 
 	// Start SDL
 	SDL_Init(SDL_INIT_VIDEO);
-	std::string windowName = "WorstGB - ";
+	std::string windowName = "yobemaG - ";
 	windowName += emulator.rom.name.c_str();
 	SDL_Window *window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
@@ -246,9 +254,9 @@ int main(int argc, char *argv[]) {
 		emulator.ppu.frameDone = false;
 		while (!emulator.ppu.frameDone) {
 			//if (emulator.cpu.r.pc == 0x0098) debug = true;
-			//if ((emulator.cpu.mCycle == 0) && (emulator.cpu.counter == 1))
 			//	printf("0x%04X\n", emulator.cpu.r.pc);
-			//	printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n", emulator.cpu.r.a, emulator.cpu.r.f, emulator.cpu.r.b, emulator.cpu.r.c, emulator.cpu.r.d, emulator.cpu.r.e, emulator.cpu.r.h, emulator.cpu.r.l, emulator.cpu.r.sp, emulator.cpu.r.pc, emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
+			if (argConsoleLog)
+				printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n", emulator.cpu.r.a, emulator.cpu.r.f, emulator.cpu.r.b, emulator.cpu.r.c, emulator.cpu.r.d, emulator.cpu.r.e, emulator.cpu.r.h, emulator.cpu.r.l, emulator.cpu.r.sp, emulator.cpu.r.pc, emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
 			if (debug && (emulator.cpu.counter == 1) && (emulator.cpu.mCycle == 0)) {
 				printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 				printf("AF:  0x%02X %02X\n", emulator.cpu.r.a, emulator.cpu.r.f);
@@ -276,7 +284,7 @@ int main(int argc, char *argv[]) {
 				printf("Current Scanline:  %d\n", emulator.ppu.line);
 				getchar();
 			}
-			emulator.cycle();
+			emulator.cycleCpu();
 		}
 		
 		// Convert framebuffer to screen colors
