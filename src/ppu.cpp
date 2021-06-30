@@ -20,11 +20,11 @@ GameboyPPU::GameboyPPU(Gameboy& bus_) : bus(bus_) {
 
 void GameboyPPU::cycle() {
 	// Do DMA if requested
-	if (bus.dmaCountdown == 1) {
+	if (bus.oamDMAState == DMA_IN_PROGRESS) {
 		for (int i = 0; i < 160; i++) {
 			oam[i] = bus.read8((dmaAddress << 8) + i);
 		}
-		bus.dmaCountdown = 0;
+		bus.oamDMAState = NO_DMA;
 		bus.dmaCyclesLeft = 160;
 	}
 	
@@ -62,6 +62,7 @@ void GameboyPPU::cycle() {
 			int pixelNo;
 			for (int i = 0; i < 160; i++) {			
 				uint8_t *outputBuffPixel = &outputFramebuffer[(line * 160) + i]; // Get index of pixel in framebuffer
+				objScanlineTransparent[i] = true;
 				
 				// Detect if window or background pixel
 				if (lcdcValues[i].windowEnable && windowTriggeredThisFrame && (i >= (windowX - 7))) {
@@ -85,8 +86,8 @@ void GameboyPPU::cycle() {
 					}
 
 					pixelNo = 7 - ((i - (windowX - 7)) % 8);
-					*outputBuffPixel = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
-					*outputBuffPixel = (bgPalettes[i] >> (*outputBuffPixel * 2)) & 0x3; // Adjust based on palette
+					scanline[i] = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
+					*outputBuffPixel = (bgPalettes[i] >> (scanline[i] * 2)) & 0x3; // Adjust based on palette
 				} else { // Background
 					readTileNum = vram[
 						(lcdcValues[i].bgTileMapOffset ? 0x1C00 : 0x1800) +	// Get start of tile map
@@ -102,29 +103,29 @@ void GameboyPPU::cycle() {
 					}
 
 					pixelNo = 7 - ((i + scrollX) % 8);
-					*outputBuffPixel = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
-					*outputBuffPixel = (bgPalettes[i] >> (*outputBuffPixel * 2)) & 0x3; // Adjust based on palette
+					scanline[i] = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
+					*outputBuffPixel = (bgPalettes[i] >> (scanline[i] * 2)) & 0x3; // Adjust based on palette
 				}
 
 				if (!lcdcValues[i].bgWindowEnable) {
 					*outputBuffPixel = backgroundPalette & 3;
 				}
 			}
-			/*
-			if (!bus.cgbMode) {
+			
+			if (bus.system == SYSTEM_DMG) {
 				// Insertion sort by X coordinate "adapted" from tutorialspoint
 				OamEntry key;
 				int j;
 				for (int i = 0; i < oamBufferSize; i++) {
-					memcpy(&key, &oamBuffer[i], sizeof(OamEntry));
+					key.raw = oamBuffer[i].raw;
 					j = i;
-					while (j > 0 && oamBuffer[j-1].xPos < key.xPos) {
-						memcpy(&oamBuffer[j], &oamBuffer[j-1], sizeof(OamEntry));
+					while (j > 0 && oamBuffer[j-1].xPos <= key.xPos) {
+						oamBuffer[j] = oamBuffer[j - 1];
 						j--;
 					}
-					memcpy(&oamBuffer[j], &key, sizeof(OamEntry));
+					oamBuffer[j].raw = key.raw;
 				}
-			}*/
+			}
 			for (int i = 0; i < oamBufferSize; i++) {
 				if (oamBuffer[i].xPos >= 168)
 					continue;
@@ -158,23 +159,37 @@ void GameboyPPU::cycle() {
 					pixelColor = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
 					// Adjust based on palette
 					bool pixelTransparent = (pixelColor == 0) ? true : false;
-					if (oamBuffer[i].palette) {
+					if (oamBuffer[i].paletteDMG) {
 						pixelColor = (objectPalette1 >> (pixelColor * 2)) & 0x3;
 					} else {
 						pixelColor = (objectPalette0 >> (pixelColor * 2)) & 0x3;
 					}
 
-					if (oamBuffer[i].priority) {
+					if (oamBuffer[i].priority) { // Background/window have priority
+						if (scanline[pixelX] == 0) {
+							objScanline[pixelX] = pixelColor;
+							objScanlineTransparent[pixelX] = false;
+						}
 						if (pixelTransparent)
-							pixelColor = 0;
-						if (outputFramebuffer[(line * 160) + pixelX] == 0)
-							outputFramebuffer[(line * 160) + pixelX] = pixelColor;
-					} else {
-						if (!pixelTransparent)
-							outputFramebuffer[(line * 160) + pixelX] = pixelColor;
+							objScanlineTransparent[pixelX] = true;
+					} else { // Object has priority
+						if (!pixelTransparent) {
+							objScanline[pixelX] = pixelColor;
+							objScanlineTransparent[pixelX] = false;
+						} else {
+							objScanlineTransparent[pixelX] = true;
+						}
 					}
 				}
 			}
+			for (int i = 0; i < 160; i++) {
+				//printf("%d", scanline[i]);
+				if (!objScanlineTransparent[i]) {
+					//printf("t");
+					outputFramebuffer[(line * 160) + i] = objScanline[i];
+				}
+			}
+			//printf("\n");
 			setMode(PPU_HBLANK);
 		}
 		break;
@@ -247,9 +262,9 @@ void GameboyPPU::write(uint16_t address, uint8_t value) {
 		checkLCDStatusForInterrupt();
 		return;
 	case 0xFF46: // DMA
-		if (bus.dmaCountdown)
+		if (bus.oamDMAState != NO_DMA)
 			return;
-		bus.dmaCountdown = 2;
+		bus.oamDMAState = WAITING_FOR_DMA;
 		dmaAddress = value;
 		if (dmaAddress > 0xDF)
 			dmaAddress -= 0x20;
@@ -310,7 +325,6 @@ uint8_t GameboyPPU::read(uint16_t address) {
 }
 
 void GameboyPPU::setMode(enum ppuModes newMode) {
-	//printf("Mode %d took %d cycles.\n", mode, modeCycle + 1);
 	switch (newMode) {
 	case PPU_HBLANK:
 		// Using nothing

@@ -1,10 +1,8 @@
 Just random things I need or want to do in no particular order
 
 implement sound
-fix object priority
 implement MBCs
 implement serial
-implement input
 implement debugging
 settings file
 various hardware bugs
@@ -13,4 +11,3 @@ memory viewer
 run this monstrosity through clang-format or whatever it is
 CGB support (may require rewriting much of PPU)
 get all tests to pass
-pass cpu instruction test 02

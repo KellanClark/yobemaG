@@ -1,5 +1,9 @@
 
+//#include "imgui/imgui.h"
+//#include "imgui/imgui_impl_sdl.h"
+//#include "imgui/imgui_impl_opengl3.h"
 #include <SDL2/SDL.h>
+#include "glad/glad.h"
 
 #include "gameboy.hpp"
 
@@ -11,8 +15,8 @@ bool argRomGiven;
 std::filesystem::path argRomFilePath;
 bool argBootromGiven;
 std::filesystem::path argBootromFilePath;
-bool argSystemGiven;
-bool argConsoleLog;
+systemType argSystem;
+bool argLogConsole;
 
 // I have no idea how this works. I found this piece of magic on the internet somewhere.
 constexpr auto cexprHash(const char *str, std::size_t v = 0) noexcept -> std::size_t {
@@ -54,8 +58,9 @@ int main(int argc, char *argv[]) {
 	}
 	argRomGiven = false;
 	argBootromGiven = false;
-	argSystemGiven = false;
-	argConsoleLog = false;
+	argBootromFilePath = "";
+	argSystem = SYSTEM_DEFAULT;
+	argLogConsole = false;
 	for (int i = 1; i < argc; i++) {
 		switch (cexprHash(argv[i])) {
 		case cexprHash("--rom"):
@@ -75,14 +80,24 @@ int main(int argc, char *argv[]) {
 			argBootromFilePath = argv[i];
 			break;
 		case cexprHash("--system"):
-			if (argc == (i + 1)) {
+			if (argc == ++i) {
 				printf("Not enough arguments for flag --system\n");
 				return -1;
 			}
-			//
+			switch (cexprHash(argv[i])) {
+			case cexprHash("dmg"):
+				argSystem = SYSTEM_DMG;
+				break;
+			case cexprHash("cgb"):
+				argSystem = SYSTEM_CGB;
+				break;
+			default:
+				printf("Unknown argument for flag --system:  %s", argv[i]);
+				return -1;
+			}
 			break;
 		case cexprHash("--log-to-console"):
-			argConsoleLog = true;
+			argLogConsole = true;
 			break;
 		default:
 			if (i == 1) {
@@ -99,20 +114,20 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	// Load cartridge and print info
-	if (argBootromGiven) {
+	// Load cartridge
+	if (argBootromGiven)
 		printf("Bootrom File Name:  %s\n", argBootromFilePath.c_str());
-		if (emulator.rom.load(argRomFilePath, argBootromFilePath))
-			return -1;
-	} else {
-		if (emulator.rom.load(argRomFilePath, ""))
-			return -1;
-	}
+	if (emulator.rom.load(argRomFilePath, argBootromFilePath, argSystem))
+		return -1;
+
+	// Print info about cartridge
 	printf("Rom File Name:  %s\n", argRomFilePath.c_str());
 	printf("File Size:  %d\n", (int)emulator.rom.romBuff.size());
 	printf("Rom Name:  %s\n", emulator.rom.name.c_str());
 	printf("External ROM Banks:  %d\n", emulator.rom.extROMBanks);
 	printf("External ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
+	printf("Game Supports DMG:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
+	printf("Game Supports CGB:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
 	printf("Game Supports SGB Features:  %s\n", (emulator.rom.sgbSupported ? "True" : "False"));
 	printf("Memory Bank Controller:  %s\n", emulator.rom.mbcString);
 	printf("Game Has Save Battery:  %s\n", (emulator.rom.saveBatteryEnabled ? "True" : "False"));
@@ -143,7 +158,9 @@ int main(int argc, char *argv[]) {
 	windowName += emulator.rom.name.c_str();
 	SDL_Window *window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+	//SDL_AudioDeviceID audioDevice = SDL_OpenAudioDevice(NULL, 0, , , 0);
 	//SDL_AudioStream *audioStream SDL_NewAudioStream();
+	// Create texture for drawing to screen
 	SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STATIC, 160, 144);
 
 	/*SDL_Color colors[4] = {
@@ -161,6 +178,7 @@ int main(int argc, char *argv[]) {
 	memset(emulator.ppu.outputFramebuffer, 0, 160 * 144 * sizeof(uint8_t));
 
 	bool debug = false;
+	bool unlockFramerate = false;
 	bool quit = false;
 	SDL_Event event;
 	while (!quit) {
@@ -180,6 +198,9 @@ int main(int argc, char *argv[]) {
 				switch (event.key.keysym.sym) {
 				case SDLK_d:
 					//debug = true;
+					break;
+				case SDLK_u:
+					unlockFramerate = unlockFramerate ? false : true;
 					break;
 				case SDLK_s:
 					emulator.rom.save();
@@ -201,11 +222,11 @@ int main(int argc, char *argv[]) {
 					directionButtonPressed = true;
 					break;
 				case SDLK_z:
-					joypadButtons.a = 0;
+					joypadButtons.b = 0;
 					actionButtonPressed = true;
 					break;
 				case SDLK_x:
-					joypadButtons.b = 0;
+					joypadButtons.a = 0;
 					actionButtonPressed = true;
 					break;
 				case SDLK_n:
@@ -235,10 +256,10 @@ int main(int argc, char *argv[]) {
 					joypadButtons.down = 1;
 					break;
 				case SDLK_z:
-					joypadButtons.a = 1;
+					joypadButtons.b = 1;
 					break;
 				case SDLK_x:
-					joypadButtons.b = 1;
+					joypadButtons.a = 1;
 					break;
 				case SDLK_n:
 					joypadButtons.select = 1;
@@ -255,7 +276,7 @@ int main(int argc, char *argv[]) {
 		while (!emulator.ppu.frameDone) {
 			//if (emulator.cpu.r.pc == 0x0098) debug = true;
 			//	printf("0x%04X\n", emulator.cpu.r.pc);
-			if (argConsoleLog)
+			if (argLogConsole)
 				printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n", emulator.cpu.r.a, emulator.cpu.r.f, emulator.cpu.r.b, emulator.cpu.r.c, emulator.cpu.r.d, emulator.cpu.r.e, emulator.cpu.r.h, emulator.cpu.r.l, emulator.cpu.r.sp, emulator.cpu.r.pc, emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
 			if (debug && (emulator.cpu.counter == 1) && (emulator.cpu.mCycle == 0)) {
 				printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
@@ -299,7 +320,10 @@ int main(int argc, char *argv[]) {
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
 
-		while ((SDL_GetTicks() - frameStartTicks) < (1000 / 60));
+		if (!unlockFramerate) {
+			while ((SDL_GetTicks() - frameStartTicks) < (1000 / 60));
+				//sleep(1);
+		}
 	}
 
 	SDL_DestroyWindow(window);

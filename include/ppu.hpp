@@ -22,17 +22,21 @@ public:
 
 	uint8_t outputFramebuffer[160*144];
 	uint8_t vram[0x2000];
-	typedef struct {
-		uint8_t yPos;
-		uint8_t xPos;
-		uint8_t tileIndex;
+	typedef union {
 		struct {
-			uint8_t : 4;
-			uint8_t palette : 1;
-			uint8_t xFlip : 1;
-			uint8_t yFlip : 1;
-			uint8_t priority : 1;
+			uint8_t yPos;
+			uint8_t xPos;
+			uint8_t tileIndex;
+			struct {
+				uint8_t paletteCGB : 3;
+				uint8_t tileBank : 1;
+				uint8_t paletteDMG : 1;
+				uint8_t xFlip : 1;
+				uint8_t yFlip : 1;
+				uint8_t priority : 1;
+			};
 		};
+		uint32_t raw;
 	} OamEntry;
 	union {
 		OamEntry oamEntries[40];
@@ -91,8 +95,11 @@ public:
 	LCDC_t lcdcValues[160];
 
 	// LCD Transfer variables
+	uint8_t scanline[160];
 	OamEntry oamBuffer[10];
 	int oamBufferSize;
+	uint8_t objScanline[160];
+	bool objScanlineTransparent[160];
 	bool windowTriggeredThisFrame;
 	uint8_t windowLineCounter;
 };
