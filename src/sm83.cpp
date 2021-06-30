@@ -179,8 +179,12 @@ void SM83::executeOpcode() {
 		bus.cpu.halted = true;
 		return;
 	case 0xC3: // JP imm16
+		memOperand16 = fetchByte(r.pc++);
+		memOperand16 |= fetchByte(r.pc++) << 8;
 		bus.cycleSystem();
-		r.pc = fetchWord(r.pc);
+		r.pc = memOperand16;
+		/*bus.cycleSystem();
+		r.pc = fetchWord(r.pc);*/
 		return;
 	case 0xC9: // RET
 		bus.cycleSystem();
@@ -189,13 +193,19 @@ void SM83::executeOpcode() {
 		r.pc = bus.pop16();
 		return;
 	case 0xCD: // CALL imm16
+		memOperand16 = fetchByte(r.pc++);
+		memOperand16 |= fetchByte(r.pc++) << 8;
 		bus.cycleSystem();
+		writeByte(--r.sp, r.pc >> 8);
+		writeByte(--r.sp, r.pc & 0xFF);
+		r.pc = memOperand16;
+		/*bus.cycleSystem();
 		bus.cycleSystem();
 		bus.cycleSystem();
 		bus.cycleSystem();
 		bus.cycleSystem();
 		bus.push16(r.pc + 2);
-		r.pc = bus.read16(r.pc);
+		r.pc = bus.read16(r.pc);*/
 		return;
 	case 0xD9: // RETI
 		bus.cycleSystem();
@@ -211,14 +221,14 @@ void SM83::executeOpcode() {
 		writeByte((0xFF00 + r.c), r.a);
 		return;
 	case 0xE8: // ADD SP, imm8
-		bus.cycleSystem();
-		bus.cycleSystem();
 		setZ(0);
 		setN(0);
 		memOperand8 = fetchByte(r.pc++);
 		setC((((r.sp & 0xFF) + ((int8_t)memOperand8 & 0xFF)) > 0xFF) ? 1 : 0);
 		testHAdd(r.sp, (int8_t)memOperand8, 0);
 		r.sp += (int8_t)memOperand8;
+		bus.cycleSystem();
+		bus.cycleSystem();
 		return;
 	case 0xE9: // JP HL
 		r.pc = r.hl;
@@ -465,8 +475,11 @@ bool SM83::checkBranchCondition(uint8_t opcode_) {
 
 // Reads/writes that take care of timing
 uint8_t SM83::fetchByte(uint16_t address) {
+	//bus.cycleSystem();
+	//return bus.read8(address);
+	uint8_t val = bus.read8(address);
 	bus.cycleSystem();
-	return bus.read8(address);
+	return val;
 }
 
 uint16_t SM83::fetchWord(uint16_t address) {
@@ -476,8 +489,9 @@ uint16_t SM83::fetchWord(uint16_t address) {
 }
 
 inline void SM83::writeByte(uint16_t address, uint8_t value) {
-	bus.cycleSystem();
+	//bus.cycleSystem();
 	return bus.write8(address, value);
+	bus.cycleSystem();
 }
 
 void SM83::RLC(uint8_t *operand) {

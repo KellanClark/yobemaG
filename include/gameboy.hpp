@@ -19,6 +19,18 @@
 #include "timer.hpp"
 #include "ram.hpp"
 
+enum systemType : int {
+	SYSTEM_DEFAULT,
+	SYSTEM_DMG,
+	SYSTEM_CGB
+};
+
+enum dmaStates : int {
+	NO_DMA,
+	DMA_IN_PROGRESS,
+	WAITING_FOR_DMA
+};
+
 class Gameboy {
 public:
 	GameboyCartridge rom;
@@ -48,14 +60,14 @@ public:
 	void (*serialWrite)(uint16_t address, uint8_t value);
 	uint8_t (*serialRead)(uint16_t address);
 
-	bool cgbMode;
-	int dmaCountdown; // 1 = Ready 2 = Waiting to finnish instruction
+	systemType system;
+	dmaStates oamDMAState;
 	int dmaCyclesLeft;
 	// Undocumented R/W CGB registers
-	uint8_t undocumented1;	// 0xFF02
-	uint8_t undocumented2;	// 0xFF03
-	uint8_t undocumented3;	// 0xFF04
-	uint8_t undocumented4;	// 0xFF05
+	uint8_t undocumented1;	// 0xFF72
+	uint8_t undocumented2;	// 0xFF73
+	uint8_t undocumented3;	// 0xFF74
+	uint8_t undocumented4;	// 0xFF75
 
 private:
 };

@@ -11,7 +11,7 @@ INC_DIRS := $(shell find $(SRC_DIRS) -type d) include
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -Wall -g -std=c++2a -fsanitize=address -fsanitize=leak -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all
-LDFLAGS := -lstdc++ -lSDL2 -fsanitize=address -fsanitize=leak -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all
+LDFLAGS := -lstdc++ -lSDL2 -ldl -fsanitize=address -fsanitize=leak -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all
 
 
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)

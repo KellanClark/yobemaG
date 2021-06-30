@@ -12,6 +12,7 @@ enum gbMbcType {
 	MBC_7
 };
 
+enum systemType : int;
 class Gameboy;
 class GameboyCartridge {
 public:
@@ -21,16 +22,20 @@ public:
 	~GameboyCartridge();
 	void write(uint16_t address, uint8_t value);
 	uint8_t read(uint16_t address);
-	int load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_);
+	int load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_, systemType requestedSystem);
 	void save();
 
 	// MBC reads and writes
 	void writeMBC1(uint16_t address, uint8_t value);
 	uint8_t readMBC1(uint16_t address);
+	void writeMBC2(uint16_t address, uint8_t value);
+	uint8_t readMBC2(uint16_t address);
 	void writeMBC3(uint16_t address, uint8_t value);
 	uint8_t readMBC3(uint16_t address);
+	void writeMBC5(uint16_t address, uint8_t value);
+	uint8_t readMBC5(uint16_t address);
 
-	// General misc. variables
+	// File names and data
 	std::filesystem::path romFilePath;
 	std::vector<uint8_t> romBuff;
 	size_t romSize;
@@ -41,7 +46,7 @@ public:
 	bool bootromEnabled;
 	std::filesystem::path saveFilePath;
 
-	// General misc. variables
+	// MBC variables
 	int selectedROMBank;
 	int selectedROMBankUpperBits;
 	int selectedExtRAMBank;
@@ -52,6 +57,8 @@ public:
 	std::string name;
 	enum gbMbcType mbc;
 	char mbcString[6];
+	bool dmgSupported;
+	bool cgbSupported;
 	bool sgbSupported;
 	int extROMBanks;
 	int extRAMBanks;

@@ -12,9 +12,6 @@ GameboyCPU::GameboyCPU(Gameboy& bus_) : SM83(bus_) {
 }
 
 int GameboyCPU::cycle() {
-	if (bus.dmaCountdown == 2)
-		bus.dmaCountdown = 1;
-
 	uint8_t readyInterrupts = (interruptRequests & enabledInterrupts);
 	if (readyInterrupts) {
 		// Temporary HALT implementation

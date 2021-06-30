@@ -20,21 +20,13 @@ void GameboyCartridge::write(uint16_t address, uint8_t value) {
 		return;
 	}
 
-	// Writes to ROM
-	if (address <= 0x7FFF) {
+	// Writes to cartridge
+	if ((address <= 0x7FFF) || ((address >= 0xA000) && (address <= 0xBFFF))) {
 		switch (mbc) {
 			case MBC_1:writeMBC1(address, value);break;
+			case MBC_2:writeMBC2(address, value);break;
 			case MBC_3:writeMBC3(address, value);break;
-			default:break;
-		}
-		return;
-	}
-
-	// Writes to cartridge RAM
-	if ((address >= 0xA000) && (address <= 0xBFFF)) {
-		switch (mbc) {
-			case MBC_1:writeMBC1(address, value);break;
-			case MBC_3:writeMBC3(address, value);break;
+			case MBC_5:writeMBC5(address, value);break;
 			default:break;
 		}
 		return;
@@ -56,7 +48,9 @@ uint8_t GameboyCartridge::read(uint16_t address) {
 	if (address <= 0x7FFF) {
 		switch (mbc) {
 			case MBC_1:return readMBC1(address);break;
+			case MBC_2:return readMBC2(address);break;
 			case MBC_3:return readMBC3(address);break;
+			case MBC_5:return readMBC5(address);break;
 			default:return romBuff[address];break;
 		}
 	}
@@ -65,7 +59,9 @@ uint8_t GameboyCartridge::read(uint16_t address) {
 	if ((address >= 0xA000) && (address <= 0xBFFF)) {
 		switch (mbc) {
 			case MBC_1:return readMBC1(address);break;
+			case MBC_2:return readMBC2(address);break;
 			case MBC_3:return readMBC3(address);break;
+			case MBC_5:return readMBC5(address);break;
 			default:return 0xFF;break;
 		}
 	}
@@ -73,7 +69,7 @@ uint8_t GameboyCartridge::read(uint16_t address) {
 	return 0xFF; // Default return if memory doesn't exist
 }
 
-int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_) {
+int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_, systemType requestedSystem) {
 	// Read rom data into memory
 	romFilePath = romFilePath_;
 	std::ifstream romFileStream;
@@ -121,12 +117,34 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 	}
 
 	/* Fill game info */
-	// Name
+	// Name TODO: fix this
 	name.resize(16);
 	for (int i = 0; i < 15; i++) {
 		name[i] = romBuff[0x134 + i];
 	}
 	name[15] = romBuff[0x143] & 0x7F;
+
+	// Detect and select system
+	if (romBuff[0x143] == 0x80) {
+		dmgSupported = true;
+		cgbSupported = true;
+	} else if (romBuff[0x143] == 0xC0) {
+		dmgSupported = false;
+		cgbSupported = true;
+	} else {
+		dmgSupported = true;
+		cgbSupported = false;
+	}
+	if (requestedSystem == SYSTEM_DEFAULT) {
+		bus.system = cgbSupported ? SYSTEM_CGB : SYSTEM_DMG;
+	} else {
+		bus.system = requestedSystem;
+		if (((requestedSystem == SYSTEM_DMG) && !dmgSupported) || ((requestedSystem == SYSTEM_CGB) && !cgbSupported))
+			printf("Warning: Requested system isn't supported by ROM");
+	}
+	if ((bus.system == SYSTEM_CGB) && !bootromEnabled) {
+		bus.cpu.r.af = 0x11B0;
+	}
 
 	// MBC info
 	saveBatteryEnabled=false;
@@ -240,7 +258,11 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 		printf("No external ram is assumed\n");
 		break;
 	}
-	extRAMBuff.resize(extRAMBanks * 8192);
+	if (mbc == MBC_2) {
+		extRAMBuff.resize(512);
+	} else {
+		extRAMBuff.resize(extRAMBanks * 8192);
+	}
 
 	// Load save file
 	if (saveBatteryEnabled) {
@@ -253,10 +275,6 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 		saveFileStream.read(reinterpret_cast<char*>(extRAMBuff.data()), extRAMBuff.size());
 		saveFileStream.close();
 	}
-
-	bus.cgbMode = false;
-
-	// TODO:  ROM Size  Publisher  Game Version  Title
 
 	return 0;
 }
@@ -306,6 +324,37 @@ uint8_t GameboyCartridge::readMBC1(uint16_t address) {
 	return 0xFF;
 }
 
+void GameboyCartridge::writeMBC2(uint16_t address, uint8_t value) {
+	switch (address) {
+	case 0x0000 ... 0x3FFF: // RAM enable/select ROM bank
+		if (address & 0x100) { // Select ROM bank
+			selectedROMBank = (value % extROMBanks);
+			if (!(value & 0xF))
+				selectedROMBank = 1;
+		} else { // RAM enable
+			extRAMEnabled = ((value & 0x0F) == 0xA) ? true : false;
+		}
+		break;
+	case 0xA000 ... 0xBFFF: // External RAM
+		if (extRAMEnabled)
+			extRAMBuff[(address - 0xA000) & 0x1FF] = value & 0xF;
+		break;
+	}
+}
+
+uint8_t GameboyCartridge::readMBC2(uint16_t address) {
+	switch (address) {
+	case 0x0000 ... 0x3FFF:
+		return romBuff[address];
+	case 0x4000 ... 0x7FFF:
+		return romBuff[address + ((selectedROMBank - 1) << 14)];
+	case 0xA000 ... 0xBFFF:
+		return extRAMEnabled ? ((extRAMBuff[(address - 0xA000) & 0x1FF] & 0xF) | 0xF0) : 0xFF;
+	}
+	
+	return 0xFF;
+}
+
 void GameboyCartridge::writeMBC3(uint16_t address, uint8_t value) {
 	if (address <= 0x1FFF) // RAM and timer enable
 		extRAMEnabled = ((value & 0x0F) == 0xA) ? true : false;
@@ -347,13 +396,49 @@ uint8_t GameboyCartridge::readMBC3(uint16_t address) {
 	return 0xFF;
 }
 
+void GameboyCartridge::writeMBC5(uint16_t address, uint8_t value) {
+	switch (address) {
+	case 0x0000 ... 0x1FFF: // RAM enable
+		extRAMEnabled = ((value & 0x0F) == 0xA) ? true : false;
+		break;
+	case 0x2000 ... 0x2FFF: // Select ROM bank lower bits
+		selectedROMBank = (selectedROMBank & 0x100) | value;
+		selectedROMBank = (selectedROMBank % extROMBanks);
+		break;
+	case 0x3000 ... 0x3FFF: // Select ROM bank upper bit
+		selectedROMBank = (selectedROMBank & 0xFF) | (value << 8);
+		selectedROMBank = (selectedROMBank % extROMBanks);
+		break;
+	case 0x4000 ... 0x5FFF: // Select RAM bank
+		selectedExtRAMBank = (value & 0xF) % extRAMBanks;
+		// TODO: Rumble support
+		break;
+	case 0xA000 ... 0xBFFF: // External RAM
+		if (extRAMEnabled && extRAMBanks)
+			extRAMBuff[(address - 0xA000) + (selectedExtRAMBank << 13)] = value;
+		break;
+	}
+}
+
+uint8_t GameboyCartridge::readMBC5(uint16_t address) {
+	switch (address) {
+	case 0x0000 ... 0x3FFF:
+		return romBuff[address];
+	case 0x4000 ... 0x7FFF:
+		return romBuff[address + ((selectedROMBank - 1) << 14)];
+	case 0xA000 ... 0xBFFF:
+		return (extRAMEnabled && extRAMBanks) ? extRAMBuff[(address - 0xA000) + (selectedExtRAMBank << 13)] : 0xFF;
+	}
+	
+	return 0xFF;
+}
+
 void GameboyCartridge::save() {
 	if (!saveBatteryEnabled)
 		return;
 	
 	printf("Saving...\n");
 	std::ofstream saveFileStream{saveFilePath, std::ios::binary | std::ios::trunc};
-	//saveFileStream.open(saveFilePath, std::ios::binary | std::ios::trunc);
 	if (!saveFileStream) {
 		printf("Trouble Opening Save File!");
 		return;

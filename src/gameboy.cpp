@@ -2,7 +2,7 @@
 #include "gameboy.hpp"
 
 Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t)) : rom(*this), cpu(*this), ppu(*this), ram(*this), timer(*this), apu(*this), joypadWrite(joypadWrite_), joypadRead(joypadRead_), serialWrite(serialWrite_), serialRead(serialRead_) {
-	dmaCyclesLeft=dmaCountdown=undocumented1=undocumented2=undocumented3=undocumented4 = 0;
+	dmaCyclesLeft=undocumented1=undocumented2=undocumented3=undocumented4 = 0;
 }
 
 void Gameboy::cycleCpu() {
@@ -14,9 +14,11 @@ void Gameboy::cycleSystem() {
 	for (int i = 0; i < 4; i++) {
 		apu.cycle(); // Not implemented
 		ppu.cycle();
-		if (dmaCyclesLeft)
-			--dmaCyclesLeft;
 	}
+	if (dmaCyclesLeft)
+		--dmaCyclesLeft;
+	if (oamDMAState == WAITING_FOR_DMA)
+		oamDMAState = DMA_IN_PROGRESS;
 }
 
 void Gameboy::write8(uint16_t address, uint8_t value) {
@@ -59,6 +61,22 @@ void Gameboy::write8(uint16_t address, uint8_t value) {
 	case 0xFF50: // Enable/Disbale Bootrom
 		rom.write(address, value);
 		return;
+	case 0xFF72:
+		if (system == SYSTEM_CGB)
+			undocumented1 = value;
+		return;
+	case 0xFF73:
+		if (system == SYSTEM_CGB)
+			undocumented2 = value;
+		return;
+	case 0xFF74:
+		if (system == SYSTEM_CGB)
+			undocumented3 = value;
+		return;
+	case 0xFF75:
+		if (system == SYSTEM_CGB)
+			undocumented4 = value & 0x70;
+		return;
 	case 0xFF80 ... 0xFFFF: // HRAM/Interrupt Enables
 		cpu.write(address, value);
 		return;
@@ -96,6 +114,21 @@ uint8_t Gameboy::read8(uint16_t address) {
 		return ppu.read(address);
 	case 0xFF50: // Enable/Disbale Bootrom
 		return rom.read(address);
+	case 0xFF72:
+		if (system == SYSTEM_CGB)
+			return undocumented1;
+		return 0xFF;
+	case 0xFF73:
+		if (system == SYSTEM_CGB)
+			return undocumented2;
+		return 0xFF;
+	case 0xFF74:
+		if (system == SYSTEM_CGB)
+			return undocumented3;
+		return 0xFF;
+	case 0xFF75:
+		if (system == SYSTEM_CGB)
+			return undocumented4 | 0x8F;
 	case 0xFF80 ... 0xFFFF: // HRAM/Interrupt Enables
 		return cpu.read(address);
 	default:
