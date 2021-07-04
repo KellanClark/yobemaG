@@ -356,67 +356,60 @@ uint8_t GameboyCartridge::readMBC2(uint16_t address) {
 }
 
 void GameboyCartridge::writeMBC3(uint16_t address, uint8_t value) {
-	if (address <= 0x1FFF) // RAM and timer enable
+	switch (address) {
+	case 0x0000 ... 0x1FFF: // RAM and timer enable
 		extRAMEnabled = ((value & 0x0F) == 0xA) ? true : false;
-	
-	if ((address >= 0x2000) && (address <= 0x3FFF)) { // Select ROM bank
-		if (value == 0) {
-			selectedROMBank = 1;
-		} else {
-			selectedROMBank = value;
-		}
-	}
-
-	if ((address >= 0x4000) && (address <= 0x5FFF)) { // Select RAM bank or RTC segister
-		selectedExtRAMBank = value & 3;
-	}
-	
-	if ((address >= 0x6000) && (address <= 0x7FFF)) { // Latch clock data
+		return;
+	case 0x2000 ... 0x3FFF:  // Select ROM bank
+		selectedROMBank = value ? value % extROMBanks : 1;
+		return;
+	case 0x4000 ... 0x5FFF: // Select RAM bank or RTC segister
+		selectedExtRAMBank = (value & 3) % extRAMBanks;
+		return;
+	case 0x6000 ... 0x7FFF: // Latch clock data
 		// TODO
-	}
-
-	if ((address >= 0xA000) && (address <= 0xBFFF) && extRAMEnabled && extRAMBanks) {
-		extRAMBuff[(address - 0xA000) + ((selectedExtRAMBank % extRAMBanks) * 8192)] = value;
+		return;
+	case 0xA000 ... 0xBFFF:
+		if (extRAMEnabled && extRAMBanks)
+			extRAMBuff[(address - 0xA000) + (selectedExtRAMBank << 13)] = value;
+		return;
 	}
 }
-// TODO move modulus to write function
-uint8_t GameboyCartridge::readMBC3(uint16_t address) {
-	if (address <= 0x3FFF) {
-		return romBuff[address];
-	}
-	
-	if ((address >= 0x4000) && (address <= 0x7FFF)) {
-		return romBuff[address + (((selectedROMBank % extROMBanks) - 1) * 16 * 1024)];
-	}
 
-	if ((address >= 0xA000) && (address <= 0xBFFF) && extRAMEnabled && extRAMBanks) {
-		return extRAMBuff[(address - 0xA000) + ((selectedExtRAMBank % extRAMBanks) * 8192)];
+uint8_t GameboyCartridge::readMBC3(uint16_t address) {
+	switch (address) {
+	case 0x0000 ... 0x3FFF:
+		return romBuff[address];
+	case 0x4000 ... 0x7FFF:
+		return romBuff[address + (((selectedROMBank % extROMBanks) - 1) << 14)];
+	case 0xA000 ... 0xBFFF:
+		return (extRAMEnabled && extRAMBanks) ? extRAMBuff[(address - 0xA000) + (selectedExtRAMBank << 13)] : 0xFF;
+	default:
+		return 0xFF;
 	}
-	
-	return 0xFF;
 }
 
 void GameboyCartridge::writeMBC5(uint16_t address, uint8_t value) {
 	switch (address) {
 	case 0x0000 ... 0x1FFF: // RAM enable
 		extRAMEnabled = ((value & 0x0F) == 0xA) ? true : false;
-		break;
+		return;
 	case 0x2000 ... 0x2FFF: // Select ROM bank lower bits
 		selectedROMBank = (selectedROMBank & 0x100) | value;
 		selectedROMBank = (selectedROMBank % extROMBanks);
-		break;
+		return;
 	case 0x3000 ... 0x3FFF: // Select ROM bank upper bit
 		selectedROMBank = (selectedROMBank & 0xFF) | (value << 8);
 		selectedROMBank = (selectedROMBank % extROMBanks);
-		break;
+		return;
 	case 0x4000 ... 0x5FFF: // Select RAM bank
 		selectedExtRAMBank = (value & 0xF) % extRAMBanks;
 		// TODO: Rumble support
-		break;
+		return;
 	case 0xA000 ... 0xBFFF: // External RAM
 		if (extRAMEnabled && extRAMBanks)
 			extRAMBuff[(address - 0xA000) + (selectedExtRAMBank << 13)] = value;
-		break;
+		return;
 	}
 }
 
