@@ -21,6 +21,7 @@ void GameboyTimer::cycle() {
 	}
 
 	int andResult;
+	int frameSequencerBit;
 	switch (control.speed) {
 	case 0:
 		andResult = ((1 << 9) & divider) >> 9;
@@ -36,14 +37,19 @@ void GameboyTimer::cycle() {
 		break;
 	}
 	andResult &= control.enable;
+	frameSequencerBit = (divider & (1 << 12)) >> 12;
 
 	if (andResultPrevious && !andResult) {
 		++counter;
 		if (counter == 0) // TIMA overflow
 			interruptCountdown = 1;
 	}
+	if (frameSequencerBitPrevious && !frameSequencerBit) {
+		bus.apu.tickFrameSequencer = true;
+	}
 
 	andResultPrevious = andResult;
+	frameSequencerBitPrevious = frameSequencerBit;
 
 	return;
 }

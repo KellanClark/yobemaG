@@ -24,6 +24,7 @@ public:
 	} control;			// 0xFF07
 
 	int andResultPrevious;
+	int frameSequencerBitPrevious;
 	int interruptCountdown;
 	bool reloadedThisCycle;
 };

@@ -48,6 +48,13 @@ uint8_t serialControl;
 void serialWriteCallback(uint16_t address, uint8_t value);
 uint8_t serialReadCallback(uint16_t address);
 
+// Audio stuff
+SDL_AudioSpec desiredAudioSpec, audioSpec;
+SDL_AudioDeviceID audioDevice;
+std::vector<int16_t> wavFileData;
+std::ofstream wavFileStream;
+void sampleBufferCallback();
+
 Gameboy emulator(&joypadWriteCallback, &joypadReadCallback, &serialWriteCallback, &serialReadCallback);
 
 int main(int argc, char *argv[]) {
@@ -135,9 +142,6 @@ int main(int argc, char *argv[]) {
 	printf("External RAM Banks:  %d\n", emulator.rom.extRAMBanks);
 	printf("External RAM Size:  %d\n", emulator.rom.extRAMBanks * 8 * 1024);
 
-	// Pass remaining arguments to system
-	//if (argSystemGiven) emulator.system = ;
-
 	// Initalize some values
 	serialData = 0;
 	serialControl = 0;
@@ -153,15 +157,41 @@ int main(int argc, char *argv[]) {
 	}*/
 
 	// Start SDL
-	SDL_Init(SDL_INIT_VIDEO);
+	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 	std::string windowName = "yobemaG - ";
 	windowName += emulator.rom.name.c_str();
 	SDL_Window *window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
-	//SDL_AudioDeviceID audioDevice = SDL_OpenAudioDevice(NULL, 0, , , 0);
-	//SDL_AudioStream *audioStream SDL_NewAudioStream();
+	desiredAudioSpec = {
+		.freq = 48000,
+		.format = AUDIO_S16,
+		.channels = 2,
+		.samples = 1024,
+		.callback = NULL
+	};
+	audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredAudioSpec, &audioSpec, 0);
+	SDL_PauseAudioDevice(audioDevice, 0);
+	emulator.apu.sampleBufferFull = &sampleBufferCallback;
 	// Create texture for drawing to screen
 	SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STATIC, 160, 144);
+
+	// WAV file
+	struct  __attribute__((__packed__)) {
+		char riffStr[4] = {'R', 'I', 'F', 'F'};
+		unsigned int fileSize = 0;
+		char waveStr[4] = {'W', 'A', 'V', 'E'};
+		char fmtStr[4] = {'f', 'm', 't', ' '};
+		unsigned int subchunk1Size = 16;
+		unsigned short audioFormat = 1;
+		unsigned short numChannels = 2;
+		unsigned int sampleRate = 48000;
+		unsigned int byteRate = 48000 * 2 * 2;
+		unsigned short blockAlign = 4;
+		unsigned short bitsPerSample = 16;
+		char dataStr[4] = {'d', 'a', 't', 'a'};
+		unsigned int subchunk2Size = 0;
+	} wavHeaderData;
+	wavFileStream.open("output.wav", std::ios::binary | std::ios::trunc);
 
 	/*SDL_Color colors[4] = {
 		{155, 188,  15, 255},
@@ -278,7 +308,7 @@ int main(int argc, char *argv[]) {
 			//	printf("0x%04X\n", emulator.cpu.r.pc);
 			if (argLogConsole)
 				printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n", emulator.cpu.r.a, emulator.cpu.r.f, emulator.cpu.r.b, emulator.cpu.r.c, emulator.cpu.r.d, emulator.cpu.r.e, emulator.cpu.r.h, emulator.cpu.r.l, emulator.cpu.r.sp, emulator.cpu.r.pc, emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
-			if (debug && (emulator.cpu.counter == 1) && (emulator.cpu.mCycle == 0)) {
+			if (debug) {
 				printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 				printf("AF:  0x%02X %02X\n", emulator.cpu.r.a, emulator.cpu.r.f);
 				printf("BC:  0x%02X %02X\n", emulator.cpu.r.b, emulator.cpu.r.c);
@@ -305,8 +335,12 @@ int main(int argc, char *argv[]) {
 				printf("Current Scanline:  %d\n", emulator.ppu.line);
 				getchar();
 			}
-			emulator.cycleCpu();
+			emulator.cpu.cycle();
 		}
+
+		// Tmp audio bandaid
+		sampleBufferCallback();
+		emulator.apu.sampleIndex = 0;
 		
 		// Convert framebuffer to screen colors
 		for (int i = 0; i < (160*144); i++) {
@@ -326,6 +360,13 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	wavHeaderData.subchunk2Size = (wavFileData.size() * sizeof(int16_t));
+	wavHeaderData.fileSize = sizeof(wavHeaderData) - 8 + wavHeaderData.subchunk2Size;
+	wavFileStream.write(reinterpret_cast<const char*>(&wavHeaderData), sizeof(wavHeaderData));
+	wavFileStream.write(reinterpret_cast<const char*>(wavFileData.data()), wavFileData.size() * sizeof(int16_t));
+	wavFileStream.close();
+
+	SDL_CloseAudioDevice(audioDevice);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 
@@ -375,4 +416,9 @@ uint8_t serialReadCallback(uint16_t address) {
 		return serialControl;
 	
 	return 0xFF;
+}
+
+void sampleBufferCallback() {
+	wavFileData.insert(wavFileData.end(), emulator.apu.sampleBuffer.begin(), emulator.apu.sampleBuffer.begin() + emulator.apu.sampleIndex);
+	SDL_QueueAudio(audioDevice, &emulator.apu.sampleBuffer, emulator.apu.sampleIndex * sizeof(int16_t));
 }

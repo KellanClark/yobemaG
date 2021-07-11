@@ -11,6 +11,14 @@ public:
 	void write(uint16_t address, uint8_t value);
 	uint8_t read(uint16_t address);
 
+	void (*sampleBufferFull)();
+	bool tickFrameSequencer;
+	int frameSequencerCounter;
+	int cyclesPerSample;
+	int sampleCounter;
+	int sampleIndex;
+	std::array<int16_t, 2048> sampleBuffer;
+
 	// Registers
 	struct {
 		union {
@@ -80,6 +88,12 @@ public:
 			};
 			uint8_t NR24;
 		};				// 0xFF19
+		int frequencyTimer;
+		unsigned int waveIndex;
+		int lengthCounter;
+		int periodTimer;
+		int currentVolume;
+		float volumeFloat;
 	} channel2;
 	struct {
 		union {
@@ -149,6 +163,43 @@ public:
 			uint8_t NR44;
 		};				// 0xFF23
 	} channel4;
+	struct {
+		union {
+			struct {
+				uint8_t out1volume : 3;
+				uint8_t vinout1 : 1;
+				uint8_t out2volume : 3;
+				uint8_t vinout2 : 1;
+			};
+			uint8_t NR50;
+		};				// 0xFF24
+		union {
+			struct {
+				uint8_t ch1out1 : 1;
+				uint8_t ch2out1 : 1;
+				uint8_t ch3out1 : 1;
+				uint8_t ch4out1 : 1;
+				uint8_t ch1out2 : 1;
+				uint8_t ch2out2 : 1;
+				uint8_t ch3out2 : 1;
+				uint8_t ch4out2 : 1;
+			};
+			uint8_t NR51;
+		};				// 0xFF25
+		union {
+			struct {
+				uint8_t ch1On : 1;
+				uint8_t ch2On : 1;
+				uint8_t ch3On : 1;
+				uint8_t ch4On : 1;
+				uint8_t : 3;
+				uint8_t allOn : 1;
+			};
+			uint8_t NR52;
+		};				// 0xFF26
+		float volumeFloat1;
+		float volumeFloat2;
+	} soundControl;
 };
 
 #endif

@@ -5,10 +5,6 @@ Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (
 	dmaCyclesLeft=undocumented1=undocumented2=undocumented3=undocumented4 = 0;
 }
 
-void Gameboy::cycleCpu() {
-	cpu.cycle();
-}
-
 void Gameboy::cycleSystem() {
 	timer.cycle();
 	for (int i = 0; i < 4; i++) {
@@ -54,6 +50,7 @@ void Gameboy::write8(uint16_t address, uint8_t value) {
 		cpu.write(address, value);
 		return;
 	case 0xFF10 ... 0xFF3F: // APU
+		apu.write(address, value);
 		return;
 	case 0xFF40 ... 0xFF4B: // PPU Registers
 		ppu.write(address, value);
@@ -109,7 +106,7 @@ uint8_t Gameboy::read8(uint16_t address) {
 	case 0xFF0F:
 		return cpu.read(address);
 	case 0xFF10 ... 0xFF3F: // APU
-		return 0xFF;
+		return apu.read(address);
 	case 0xFF40 ... 0xFF4B: // PPU Registers
 		return ppu.read(address);
 	case 0xFF50: // Enable/Disbale Bootrom

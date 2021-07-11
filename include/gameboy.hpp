@@ -41,7 +41,6 @@ public:
 	GameboyAPU apu;
 
 	Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t));
-	void cycleCpu();
 	void cycleSystem();
 
 	// Memory functions
