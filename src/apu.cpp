@@ -101,7 +101,7 @@ void GameboyAPU::write(uint16_t address, uint8_t value) {
 		channel2.NR23 = value;
 		return;
 	case 0xFF19: // NR24
-		channel2.NR24 = value & 0xC3;
+		channel2.NR24 = value & 0xC7;
 		if (value & 0x80) {
 			if (!channel2.lengthCounter)
 				channel2.lengthCounter = 64;
