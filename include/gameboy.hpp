@@ -40,7 +40,9 @@ public:
 	GameboyTimer timer;
 	GameboyAPU apu;
 
-	Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t));
+	Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(),
+			void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t),
+			void (*apuSampleBufferFull)());
 	void cycleSystem();
 
 	// Memory functions

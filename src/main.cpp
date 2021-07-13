@@ -55,7 +55,9 @@ std::vector<int16_t> wavFileData;
 std::ofstream wavFileStream;
 void sampleBufferCallback();
 
-Gameboy emulator(&joypadWriteCallback, &joypadReadCallback, &serialWriteCallback, &serialReadCallback);
+Gameboy emulator(&joypadWriteCallback, &joypadReadCallback,
+				&serialWriteCallback, &serialReadCallback,
+				&sampleBufferCallback);
 
 int main(int argc, char *argv[]) {
 	// Parse arguments
@@ -171,7 +173,7 @@ int main(int argc, char *argv[]) {
 	};
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredAudioSpec, &audioSpec, 0);
 	SDL_PauseAudioDevice(audioDevice, 0);
-	emulator.apu.sampleBufferFull = &sampleBufferCallback;
+	emulator.apu.sampleRate = 48000;
 	// Create texture for drawing to screen
 	SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STATIC, 160, 144);
 
@@ -338,9 +340,9 @@ int main(int argc, char *argv[]) {
 			emulator.cpu.cycle();
 		}
 
-		// Tmp audio bandaid
+		// Temporary audio bandaid
 		sampleBufferCallback();
-		emulator.apu.sampleIndex = 0;
+		emulator.apu.sampleBufferIndex = 0;
 		
 		// Convert framebuffer to screen colors
 		for (int i = 0; i < (160*144); i++) {
@@ -419,6 +421,6 @@ uint8_t serialReadCallback(uint16_t address) {
 }
 
 void sampleBufferCallback() {
-	wavFileData.insert(wavFileData.end(), emulator.apu.sampleBuffer.begin(), emulator.apu.sampleBuffer.begin() + emulator.apu.sampleIndex);
-	SDL_QueueAudio(audioDevice, &emulator.apu.sampleBuffer, emulator.apu.sampleIndex * sizeof(int16_t));
+	wavFileData.insert(wavFileData.end(), emulator.apu.sampleBuffer.begin(), emulator.apu.sampleBuffer.begin() + emulator.apu.sampleBufferIndex);
+	SDL_QueueAudio(audioDevice, &emulator.apu.sampleBuffer, emulator.apu.sampleBufferIndex * sizeof(int16_t));
 }

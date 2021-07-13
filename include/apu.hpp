@@ -6,7 +6,7 @@ class GameboyAPU {
 public:
 	Gameboy& bus;
 
-	GameboyAPU(Gameboy& bus_);
+	GameboyAPU(Gameboy& bus_, void (*sampleBufferFull_)());
 	void cycle(void);
 	void write(uint16_t address, uint8_t value);
 	uint8_t read(uint16_t address);
@@ -14,9 +14,9 @@ public:
 	void (*sampleBufferFull)();
 	bool tickFrameSequencer;
 	int frameSequencerCounter;
-	int cyclesPerSample;
+	int sampleRate;
 	int sampleCounter;
-	int sampleIndex;
+	int sampleBufferIndex;
 	std::array<int16_t, 2048> sampleBuffer;
 
 	// Registers
@@ -58,6 +58,12 @@ public:
 			};
 			uint8_t NR14;
 		};				// 0xFF14
+		int frequencyTimer;
+		unsigned int waveIndex;
+		int lengthCounter;
+		int periodTimer;
+		int currentVolume;
+		float volumeFloat;
 	} channel1;
 	struct {
 		union {
