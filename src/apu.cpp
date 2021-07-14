@@ -1,11 +1,18 @@
 
 #include "gameboy.hpp"
 
-const int16_t squareWaveDutyCycles[4][8] {
+/*const int16_t squareWaveDutyCycles[4][8] {
 	{-32768, -32768, -32768, -32768, -32768, -32768, -32768,  32767}, // 12.5%
 	{ 32767, -32768, -32768, -32768, -32768, -32768, -32768,  32767}, // 25%
 	{ 32767, -32768, -32768, -32768, -32768,  32767,  32767,  32767}, // 50%
 	{-32768,  32767,  32767,  32767,  32767,  32767,  32767, -32768}  // 75%
+};*/
+
+const float squareWaveDutyCycles[4][8] {
+	{0, 0, 0, 0, 0, 0, 0, 1}, // 12.5%
+	{1, 0, 0, 0, 0, 0, 0, 1}, // 25%
+	{1, 0, 0, 0, 0, 1, 1, 1}, // 50%
+	{0, 1, 1, 1, 1, 1, 1, 0}  // 75%
 };
 
 GameboyAPU::GameboyAPU(Gameboy& bus_, void (*sampleBufferFull_)()) : bus(bus_), sampleBufferFull(sampleBufferFull_) {
@@ -15,6 +22,21 @@ GameboyAPU::GameboyAPU(Gameboy& bus_, void (*sampleBufferFull_)()) : bus(bus_), 
 	sampleBufferIndex = 0;
 
 	return;
+}
+
+int GameboyAPU::calculateSweepFrequency() {
+	int newFrequency = channel1.shadowFrequency >> channel1.sweepShift;
+
+	if (channel1.sweepDecrease) {
+		newFrequency = channel1.shadowFrequency - newFrequency;
+	} else {
+		newFrequency = channel1.shadowFrequency + newFrequency;
+	}
+
+	if (newFrequency > 2047)
+		soundControl.ch1On = false;
+	
+	return newFrequency;
 }
 
 void GameboyAPU::cycle() {
@@ -52,7 +74,6 @@ void GameboyAPU::cycle() {
 					} else if ((channel1.currentVolume > 0) && !channel1.envelopeIncrease) {
 						--channel1.currentVolume;
 					}
-					channel1.volumeFloat = (float)channel1.currentVolume / 15;
 				}
 			}
 			if (channel2.periodTimer) {
@@ -63,12 +84,26 @@ void GameboyAPU::cycle() {
 					} else if ((channel2.currentVolume > 0) && !channel2.envelopeIncrease) {
 						--channel2.currentVolume;
 					}
-					channel2.volumeFloat = (float)channel2.currentVolume / 15;
 				}
 			}
 		}
 		if (tickSweep) {
-			//
+			if (channel1.sweepTimer) {
+				if ((--channel1.sweepTimer) == 0) {
+					channel1.sweepTimer = channel1.sweepTime ? channel1.sweepTime : 8;
+
+					if (channel1.sweepEnabled && channel1.sweepTime) {
+						int calculatedNewFrequency = calculateSweepFrequency();
+						if ((calculatedNewFrequency < 2048) && channel1.sweepShift) {
+							channel1.frequencyLowBits = calculatedNewFrequency & 0xFF;
+							channel1.frequencyHighBits = (calculatedNewFrequency >> 8) & 7;
+							channel1.shadowFrequency = calculatedNewFrequency;
+
+							calculateSweepFrequency();
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -87,13 +122,15 @@ void GameboyAPU::cycle() {
 		sampleCounter -= 4194304;
 
 		// Sample each channel
-		int16_t ch1Sample = 0;//soundControl.ch1On * channel1.volumeFloat * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex];
-		int16_t ch2Sample = soundControl.ch2On * channel2.volumeFloat * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex];
+		int16_t ch1Sample = soundControl.ch1On * (((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) - 7) / 7) * 32767;
+		int16_t ch2Sample = soundControl.ch2On * (((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) - 7) / 7) * 32767;
+		int16_t ch3Sample = 0;
+		int16_t ch4Sample = 0;
 
-		// Put samples into buffers
+		// Mix and put samples into buffers
 		if (soundControl.allOn) {
-			sampleBuffer[sampleBufferIndex++] = (((ch1Sample * soundControl.ch1out1) + (ch2Sample * soundControl.ch2out1)) / 2) * soundControl.volumeFloat1;
-			sampleBuffer[sampleBufferIndex++] = (((ch1Sample * soundControl.ch1out2) + (ch2Sample * soundControl.ch2out2)) / 2) * soundControl.volumeFloat2;
+			sampleBuffer[sampleBufferIndex++] = (((ch1Sample * soundControl.ch1out1) + (ch2Sample * soundControl.ch2out1) + (ch3Sample * soundControl.ch3out1) + (ch4Sample * soundControl.ch4out1)) / 4) * soundControl.volumeFloat1;
+			sampleBuffer[sampleBufferIndex++] = (((ch1Sample * soundControl.ch1out2) + (ch2Sample * soundControl.ch2out2) + (ch3Sample * soundControl.ch3out2) + (ch4Sample * soundControl.ch4out2)) / 4) * soundControl.volumeFloat2;
 		} else {
 			sampleBuffer[sampleBufferIndex++] = 0;
 			sampleBuffer[sampleBufferIndex++] = 0;
@@ -127,11 +164,16 @@ void GameboyAPU::write(uint16_t address, uint8_t value) {
 	case 0xFF14: // NR14
 		channel1.NR14 = value & 0xC7;
 		if (value & 0x80) {
+			channel1.shadowFrequency = (channel1.frequencyHighBits << 8) | channel1.frequencyLowBits;
+			channel1.sweepTimer = channel1.sweepTime ? channel1.sweepTime : 8;
+			if (channel1.sweepTime || channel1.sweepShift)
+				channel1.sweepEnabled = true;
+			if (channel1.sweepShift)
+				calculateSweepFrequency();
 			if (!channel1.lengthCounter)
 				channel1.lengthCounter = 64;
 			channel1.periodTimer = channel1.envelopeSweepNum;
 			channel1.currentVolume = channel1.envelopeStartVolume;
-			channel1.volumeFloat = (float)channel1.currentVolume / 15;
 			soundControl.ch1On = true;
 		}
 		return;
@@ -152,7 +194,6 @@ void GameboyAPU::write(uint16_t address, uint8_t value) {
 				channel2.lengthCounter = 64;
 			channel2.periodTimer = channel2.envelopeSweepNum;
 			channel2.currentVolume = channel2.envelopeStartVolume;
-			channel2.volumeFloat = (float)channel2.currentVolume / 15;
 			soundControl.ch2On = true;
 		}
 		return;

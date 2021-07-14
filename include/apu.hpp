@@ -10,6 +10,7 @@ public:
 	void cycle(void);
 	void write(uint16_t address, uint8_t value);
 	uint8_t read(uint16_t address);
+	int calculateSweepFrequency();
 
 	void (*sampleBufferFull)();
 	bool tickFrameSequencer;
@@ -60,10 +61,12 @@ public:
 		};				// 0xFF14
 		int frequencyTimer;
 		unsigned int waveIndex;
+		bool sweepEnabled;
+		int shadowFrequency;
+		int sweepTimer;
 		int lengthCounter;
 		int periodTimer;
 		int currentVolume;
-		float volumeFloat;
 	} channel1;
 	struct {
 		union {
@@ -99,7 +102,6 @@ public:
 		int lengthCounter;
 		int periodTimer;
 		int currentVolume;
-		float volumeFloat;
 	} channel2;
 	struct {
 		union {

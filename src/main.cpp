@@ -341,8 +341,10 @@ int main(int argc, char *argv[]) {
 		}
 
 		// Temporary audio bandaid
-		sampleBufferCallback();
-		emulator.apu.sampleBufferIndex = 0;
+		if (emulator.ppu.lcdc.lcdEnable) {
+			sampleBufferCallback();
+			emulator.apu.sampleBufferIndex = 0;
+		}
 		
 		// Convert framebuffer to screen colors
 		for (int i = 0; i < (160*144); i++) {
