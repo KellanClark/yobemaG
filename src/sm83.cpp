@@ -131,7 +131,7 @@ void SM83::executeOpcode() {
 			if (r.H)
 				r.a -= 0x6;
 		}
-		setZ(r.a?0:1);
+		testZ(r.a);
 		setH(0);
 		return;
 	case 0x2A: // LD A, (HL+)
@@ -199,13 +199,6 @@ void SM83::executeOpcode() {
 		writeByte(--r.sp, r.pc >> 8);
 		writeByte(--r.sp, r.pc & 0xFF);
 		r.pc = memOperand16;
-		/*bus.cycleSystem();
-		bus.cycleSystem();
-		bus.cycleSystem();
-		bus.cycleSystem();
-		bus.cycleSystem();
-		bus.push16(r.pc + 2);
-		r.pc = bus.read16(r.pc);*/
 		return;
 	case 0xD9: // RETI
 		bus.cycleSystem();
@@ -215,10 +208,10 @@ void SM83::executeOpcode() {
 		bus.cpu.interruptMasterEnable = true;
 		return;
 	case 0xE0: // LD (FF00+imm8), A
-		writeByte((0xFF00 + fetchByte(r.pc++)), r.a);
+		writeByte((0xFF00 | fetchByte(r.pc++)), r.a);
 		return;
 	case 0xE2: // LD (FF00+C), A
-		writeByte((0xFF00 + r.c), r.a);
+		writeByte((0xFF00 | r.c), r.a);
 		return;
 	case 0xE8: // ADD SP, imm8
 		setZ(0);
@@ -239,6 +232,11 @@ void SM83::executeOpcode() {
 		return;
 	case 0xF0: // LD A, (FF00+imm8)
 		r.a = fetchByte(0xFF00 + fetchByte(r.pc++));
+		return;
+	case 0xF1:
+		bus.cycleSystem();
+		bus.cycleSystem();
+		r.af = bus.pop16() | 0xF;
 		return;
 	case 0xF2: // LD A, (FF00+C)
 		r.a = fetchByte(0xFF00 + r.c);
@@ -386,8 +384,7 @@ void SM83::executeOpcode() {
 		case 1: // POP reg16
 			bus.cycleSystem();
 			bus.cycleSystem();
-			((opcode == 0xF1) ? r.af : *decodeReg16(opcode)) = bus.pop16();
-			r.f &= 0xF0; // Undo writes to bottom nibble of flags register
+			*decodeReg16(opcode) = bus.pop16();
 			return;
 		case 2: // JP cond, imm16
 			memOperand16 = fetchWord(r.pc);
@@ -465,21 +462,18 @@ uint16_t *SM83::decodeReg16(uint8_t opcode_) {
 
 bool SM83::checkBranchCondition(uint8_t opcode_) {
 	switch ((opcode_ & 0x18) >> 3) {
-	case 0:return (r.Z ? false : true); // NZ
-	case 1:return (r.Z ? true : false); // Z
-	case 2:return (r.C ? false : true); // NC
-	case 3:return (r.C ? true : false); // C
+	case 0:return !r.Z; // NZ
+	case 1:return r.Z;  // Z
+	case 2:return !r.C; // NC
+	case 3:return r.C;  // C
 	default:return false;
 	}
 }
 
 // Reads/writes that take care of timing
 uint8_t SM83::fetchByte(uint16_t address) {
-	//bus.cycleSystem();
-	//return bus.read8(address);
-	uint8_t val = bus.read8(address);
 	bus.cycleSystem();
-	return val;
+	return bus.read8(address);
 }
 
 uint16_t SM83::fetchWord(uint16_t address) {
@@ -489,9 +483,10 @@ uint16_t SM83::fetchWord(uint16_t address) {
 }
 
 inline void SM83::writeByte(uint16_t address, uint8_t value) {
-	//bus.cycleSystem();
-	return bus.write8(address, value);
 	bus.cycleSystem();
+	bus.write8(address, value);
+
+	return;
 }
 
 void SM83::RLC(uint8_t *operand) {
