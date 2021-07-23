@@ -1,7 +1,7 @@
 
 #include "gameboy.hpp"
 
-#define BLOCKING_ENABLED 0
+#define BLOCKING_DISABLED 0
 
 GameboyPPU::GameboyPPU(Gameboy& bus_) : bus(bus_) {
 	// Clear the VRAM, OAM, and output buffer
@@ -228,19 +228,21 @@ void GameboyPPU::cycle() {
 void GameboyPPU::write(uint16_t address, uint8_t value) {
 	switch (address) {
 	case 0x8000 ... 0x9FFF:
-		if (vramEnable || !lcdc.lcdEnable || BLOCKING_ENABLED)
+		if (vramEnable || !lcdc.lcdEnable || BLOCKING_DISABLED)
 			vram[address - 0x8000] = value;
 		return;
 	case 0xFE00 ... 0xFE9F:
-		if (oamEnable || !lcdc.lcdEnable || BLOCKING_ENABLED)
+		if (oamEnable || !lcdc.lcdEnable || BLOCKING_DISABLED)
 			oam[address - 0xFE00] = value;
 		return;
 	case 0xFF40: // LCDC
 		if (!(value & 0x80) && lcdc.lcdEnable) { // When turning LCD off
-			line = -1;
+			line = 0;
 			frameDone = true;
 			memset(outputFramebuffer, 0, sizeof(outputFramebuffer));
-			setMode(PPU_OAM_TRANSFER);
+			lcdc.value = value;
+			setMode(PPU_HBLANK);
+			return;
 		}
 
 		lcdc.value = value;
@@ -292,9 +294,9 @@ void GameboyPPU::write(uint16_t address, uint8_t value) {
 uint8_t GameboyPPU::read(uint16_t address) {
 	switch (address) {
 	case 0x8000 ... 0x9FFF:
-		return (vramEnable || !lcdc.lcdEnable || BLOCKING_ENABLED) ? vram[address - 0x8000] : 0xFF;
+		return (vramEnable || !lcdc.lcdEnable || BLOCKING_DISABLED) ? vram[address - 0x8000] : 0xFF;
 	case 0xFE00 ... 0xFE9F:
-		return (oamEnable || !lcdc.lcdEnable || BLOCKING_ENABLED) ? oam[address - 0xFE00] : 0xFF;
+		return (oamEnable || !lcdc.lcdEnable || BLOCKING_DISABLED) ? oam[address - 0xFE00] : 0xFF;
 	case 0xFF40: // LCDC
 		return lcdc.value;
 	case 0xFF41: // STAT
@@ -405,7 +407,7 @@ void GameboyPPU::checkLCDStatusForInterrupt() {
 	
 	if (!conditionsMetPrevious && conditionsMet) // STAT blocking
 		bus.cpu.requestInterrupt(INT_LCD);
-	
+
 	conditionsMetPrevious = conditionsMet;
 
 	return;
