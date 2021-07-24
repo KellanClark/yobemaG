@@ -1,7 +1,7 @@
 #ifndef GBCPU_HPP
 #define GBCPU_HPP
 
-#include "sm83.hpp"
+#include "sm83core.hpp"
 
 enum interruptVectors {
 	INT_VBLANK = 0x40,

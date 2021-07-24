@@ -1,5 +1,5 @@
 
-#include "../include/gameboy.hpp"
+#include "gameboy.hpp"
 
 // Easy ways to set flags x=arg1 y=arg2 z=carry (0 if not used)
 #define setZ(x) (r.Z = x)
