@@ -43,7 +43,7 @@ uint8_t GameboyCartridge::read(uint16_t address) {
 	// Read from bootrom
 	if (bootromEnabled && (address <= 0xFF))
 		return bootromBuff[address];
-	
+
 	// Read from cartridge ROM
 	if (address <= 0x7FFF) {
 		switch (mbc) {
@@ -78,11 +78,11 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 		printf("Failed to open ROM!\n");
 		return -1;
 	}
-	
+
 	romFileStream.seekg(0, std::ios::end);
 	romSize = romFileStream.tellg();
 	romFileStream.seekg(0, std::ios::beg);
-	
+
 	romBuff.resize(romSize);
 	romFileStream.read(reinterpret_cast<char*>(romBuff.data()), romBuff.size());
 	romFileStream.close();
@@ -106,11 +106,11 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 			printf("Failed to open bootrom!");
 			return -1;
 		}
-		
+
 		bootromFileStream.seekg(0, std::ios::end);
 		bootromSize = bootromFileStream.tellg();
 		bootromFileStream.seekg(0, std::ios::beg);
-		
+
 		bootromBuff.resize(bootromSize);
 		bootromFileStream.read(reinterpret_cast<char*>(bootromBuff.data()), bootromBuff.size());
 		bootromFileStream.close();
@@ -268,7 +268,7 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 	if (saveBatteryEnabled) {
 		saveFilePath = romFilePath;
 		saveFilePath.replace_extension(".sav");
-		
+
 		std::ifstream saveFileStream;
 		saveFileStream.open(saveFilePath, std::ios::binary);
 		saveFileStream.seekg(0, std::ios::beg);
@@ -282,7 +282,7 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 void GameboyCartridge::writeMBC1(uint16_t address, uint8_t value) {
 	if (address <= 0x1FFF) // RAM enable
 		extRAMEnabled = ((value & 0x0F) == 0xA) ? true : false;
-	
+
 	if ((address >= 0x2000) && (address <= 0x3FFF)) { // Select ROM bank lower bits
 		if ((value & 0x1F) == 0) {
 			selectedROMBank = (advancedBankingMode ? (selectedROMBank & 0x60) : 0) | 1;
@@ -294,7 +294,7 @@ void GameboyCartridge::writeMBC1(uint16_t address, uint8_t value) {
 	if ((address >= 0x4000) && (address <= 0x5FFF)) { // Select RAM bank or ROM bank upper bits
 		selectedROMBankUpperBits = value & 3;
 	}
-	
+
 	if ((address >= 0x6000) && (address <= 0x7FFF)) { // Select advanced banking mode
 		if (value & 0x1) {
 			advancedBankingMode = true;
@@ -312,7 +312,7 @@ uint8_t GameboyCartridge::readMBC1(uint16_t address) {
 	if (address <= 0x3FFF) {
 		return romBuff[address + ((((advancedBankingMode ? selectedROMBankUpperBits : 0) * 32) % extROMBanks) * 16 * 1024)];
 	}
-	
+
 	if ((address >= 0x4000) && (address <= 0x7FFF)) {
 		return romBuff[address + (((((selectedROMBankUpperBits * 32) + selectedROMBank) % extROMBanks) - 1) * 16 * 1024)];
 	}
@@ -320,7 +320,7 @@ uint8_t GameboyCartridge::readMBC1(uint16_t address) {
 	if ((address >= 0xA000) && (address <= 0xBFFF) && extRAMEnabled && extRAMBanks) {
 		return extRAMBuff[(address - 0xA000) + (((advancedBankingMode ? selectedROMBankUpperBits : 0) % extRAMBanks) * 8192)];
 	}
-	
+
 	return 0xFF;
 }
 
@@ -351,7 +351,7 @@ uint8_t GameboyCartridge::readMBC2(uint16_t address) {
 	case 0xA000 ... 0xBFFF:
 		return extRAMEnabled ? ((extRAMBuff[(address - 0xA000) & 0x1FF] & 0xF) | 0xF0) : 0xFF;
 	}
-	
+
 	return 0xFF;
 }
 
@@ -422,14 +422,14 @@ uint8_t GameboyCartridge::readMBC5(uint16_t address) {
 	case 0xA000 ... 0xBFFF:
 		return (extRAMEnabled && extRAMBanks) ? extRAMBuff[(address - 0xA000) + (selectedExtRAMBank << 13)] : 0xFF;
 	}
-	
+
 	return 0xFF;
 }
 
 void GameboyCartridge::save() {
 	if (!saveBatteryEnabled)
 		return;
-	
+
 	printf("Saving...\n");
 	std::ofstream saveFileStream{saveFilePath, std::ios::binary | std::ios::trunc};
 	if (!saveFileStream) {

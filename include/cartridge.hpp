@@ -6,7 +6,7 @@ enum gbMbcType {
 	MBC_1,
 	MBC_2,
 	MBC_3,
-	MMM01,	
+	MMM01,
 	MBC_5,
 	MBC_6,
 	MBC_7

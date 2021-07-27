@@ -55,7 +55,7 @@ void SM83::executeOpcode() {
 			SET(operand8);
 			break;
 		}
-		
+
 		if ((cbOpcode >= 0x40) && (cbOpcode <= 0x7F)) { // BIT bit, reg8
 			BIT(*operand8);
 			return;
@@ -568,7 +568,7 @@ void SM83::SRL(uint8_t *operand) {
 	setC(*operand & 0x1);
 	*operand = *operand >> 1;
 	testZ(*operand);
-	
+
 	return;
 }
 
@@ -596,7 +596,7 @@ void SM83::ADD(uint8_t operand) {
 	testHAdd(r.a, operand, 0);
 	r.a += operand;
 	testZ(r.a);
-	
+
 	return;
 }
 
@@ -647,7 +647,7 @@ void SM83::XOR(uint8_t operand) {
 	setC(0);
 	r.a ^= operand;
 	testZ(r.a);
-	
+
 	return;
 }
 
@@ -657,7 +657,7 @@ void SM83::OR(uint8_t operand) {
 	setC(0);
 	r.a |= operand;
 	testZ(r.a);
-	
+
 	return;
 }
 

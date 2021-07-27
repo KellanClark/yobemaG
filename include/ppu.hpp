@@ -42,12 +42,11 @@ public:
 		OamEntry oamEntries[40];
 		uint8_t oam[160];
 	};
-	
+
 	bool frameDone;
 	int column;
 	int modeCycle;
 	int lineCycle;
-	int frameCycle;
 	bool oamEnable;
 	bool vramEnable;
 

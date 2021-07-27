@@ -1,7 +1,7 @@
 
-//#include "imgui/imgui.h"
-//#include "imgui/imgui_impl_sdl.h"
-//#include "imgui/imgui_impl_opengl3.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_sdl.h"
+#include "imgui/imgui_impl_opengl3.h"
 #include <SDL2/SDL.h>
 #include "glad/glad.h"
 
@@ -9,7 +9,6 @@
 
 #define SCREEN_WIDTH 160*4
 #define SCREEN_HEIGHT 144*4
-#define FPS 60
 
 bool argRomGiven;
 std::filesystem::path argRomFilePath;
@@ -160,10 +159,22 @@ int main(int argc, char *argv[]) {
 
 	// Start SDL
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 	std::string windowName = "yobemaG - ";
 	windowName += emulator.rom.name.c_str();
-	SDL_Window *window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+    SDL_WindowFlags windowFlags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+	SDL_Window *window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, windowFlags);
+	SDL_GLContext gl_context = SDL_GL_CreateContext(window);
+    SDL_GL_MakeCurrent(window, gl_context);
+	gladLoadGL();
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+	// Audio
 	desiredAudioSpec = {
 		.freq = 48000,
 		.format = AUDIO_S16,
@@ -173,7 +184,7 @@ int main(int argc, char *argv[]) {
 	};
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredAudioSpec, &audioSpec, 0);
 	SDL_PauseAudioDevice(audioDevice, 0);
-	emulator.apu.sampleRate = 48000;
+	emulator.apu.sampleRate = audioSpec.freq;
 	// Create texture for drawing to screen
 	SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STATIC, 160, 144);
 
@@ -345,9 +356,9 @@ int main(int argc, char *argv[]) {
 			sampleBufferCallback();
 			emulator.apu.sampleBufferIndex = 0;
 		}
-		
+
 		// Convert framebuffer to screen colors
-		for (int i = 0; i < (160*144); i++) {
+		for (int i = 0; i < (160 * 144); i++) {
 			uint8_t color = emulator.ppu.outputFramebuffer[i];
 			pixels[i] = (colors[color].r << 24) | (colors[color].g << 16) | (colors[color].b << 8);
 		}
@@ -415,10 +426,10 @@ uint8_t serialReadCallback(uint16_t address) {
 
 	if (address == 0xFF01)
 		return serialData;
-	
+
 	if (address == 0xFF02)
 		return serialControl;
-	
+
 	return 0xFF;
 }
 

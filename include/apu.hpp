@@ -6,7 +6,7 @@ class GameboyAPU {
 public:
 	Gameboy& bus;
 
-	GameboyAPU(Gameboy& bus_, void (*sampleBufferFull_)());
+	GameboyAPU(Gameboy& bus_, void (*sampleBufferFull_)(), int sampleRate_ = 48000);
 	void cycle(void);
 	void write(uint16_t address, uint8_t value);
 	uint8_t read(uint16_t address);
@@ -170,6 +170,11 @@ public:
 			};
 			uint8_t NR44;
 		};				// 0xFF23
+		int frequencyTimer;
+		uint16_t lfsr;
+		int lengthCounter;
+		int periodTimer;
+		int currentVolume;
 	} channel4;
 	struct {
 		union {

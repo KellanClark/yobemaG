@@ -27,200 +27,197 @@ void GameboyPPU::cycle() {
 		bus.oamDMAState = NO_DMA;
 		bus.dmaCyclesLeft = 160;
 	}
-	
+
 	// Don't do anything if turned off
 	if (!lcdc.lcdEnable)
 		return;
 
-	// Have each mode do its thing
-	switch (mode) {
-	case PPU_OAM_TRANSFER: // OAM Search
-		if (modeCycle == 79)
-			setMode(PPU_LCD_TRANSFER);
-		
-		if (!(modeCycle % 2) &&
-			(oamEntries[modeCycle / 2].xPos > 0) &&
-			((line + 16) >= oamEntries[modeCycle / 2].yPos) &&
-			((line + 16) < (oamEntries[modeCycle / 2].yPos + ((lcdc.objSize + 1) * 8))) &&
-			(oamBufferSize < 10)) {
-				memcpy(&oamBuffer[oamBufferSize], &oamEntries[modeCycle / 2], sizeof(OamEntry));
-				++oamBufferSize;
-			}
-		break;
-	case PPU_LCD_TRANSFER: // LCD Transfer
-		if (modeCycle > 11) {
-			bgPalettes[modeCycle - 12] = backgroundPalette;
-			lcdcValues[modeCycle - 12].value = lcdc.value;
-		}
+	// Run 4 times because this is based on T Cycles
+	for (int i = 0; i < 4; i++) {
+		// Have each mode do its thing
+		switch (mode) {
+		case PPU_OAM_TRANSFER: // OAM Search
+			if (modeCycle == 79)
+				setMode(PPU_LCD_TRANSFER);
 
-		// Another one of the unholy abominations I dare to call code. View at your own risk
-		if (modeCycle == 171) {
-			bool drawingWindow;
-			uint8_t readData0;
-			uint8_t readData1;
-			uint8_t readTileNum;
-			int pixelNo;
-			for (int i = 0; i < 160; i++) {			
-				uint8_t *outputBuffPixel = &outputFramebuffer[(line * 160) + i]; // Get index of pixel in framebuffer
-				objScanlineTransparent[i] = true;
-				
-				// Detect if window or background pixel
-				if (lcdcValues[i].windowEnable && windowTriggeredThisFrame && (i >= (windowX - 7))) {
-					drawingWindow = true;
-				} else {
-					drawingWindow = false;
+			if (!(modeCycle % 2) &&
+				(oamEntries[modeCycle / 2].xPos > 0) &&
+				((line + 16) >= oamEntries[modeCycle / 2].yPos) &&
+				((line + 16) < (oamEntries[modeCycle / 2].yPos + ((lcdc.objSize + 1) * 8))) &&
+				(oamBufferSize < 10)) {
+					memcpy(&oamBuffer[oamBufferSize], &oamEntries[modeCycle / 2], sizeof(OamEntry));
+					++oamBufferSize;
 				}
-				
-				if (drawingWindow) { // Window
-					readTileNum = vram[
-						(lcdcValues[i].windowTileMapOffset ? 0x1C00 : 0x1800) +	// Get start of tile map
-						(((i - (windowX - 7)) / 8) & 0x1f) +						// Offset X
-						(32 * (windowLineCounter / 8))];				// Offset Y
+			break;
+		case PPU_LCD_TRANSFER: // LCD Transfer
+			if (modeCycle > 11) {
+				bgPalettes[modeCycle - 12] = backgroundPalette;
+				lcdcValues[modeCycle - 12].value = lcdc.value;
+			}
 
-					if (lcdcValues[i].tileDataNotOffset) {
-						readData0 = vram[(2 * (windowLineCounter % 8)) + (readTileNum * 16)];
-						readData1 = vram[(2 * (windowLineCounter % 8)) + (readTileNum * 16) + 1];
+			// Another one of the unholy abominations I dare to call code. View at your own risk
+			if (modeCycle == 171) {
+				bool drawingWindow;
+				uint8_t readData0;
+				uint8_t readData1;
+				uint8_t readTileNum;
+				int pixelNo;
+				for (int i = 0; i < 160; i++) {
+					uint8_t *outputBuffPixel = &outputFramebuffer[(line * 160) + i]; // Get index of pixel in framebuffer
+					objScanlineTransparent[i] = true;
+
+					// Detect if window or background pixel
+					if (lcdcValues[i].windowEnable && windowTriggeredThisFrame && (i >= (windowX - 7))) {
+						drawingWindow = true;
 					} else {
-						readData0 = vram[0x1000 + ((2 * (windowLineCounter % 8)) + ((int8_t)readTileNum * 16))];
-						readData1 = vram[0x1000 + ((2 * (windowLineCounter % 8)) + ((int8_t)readTileNum * 16)) + 1];
+						drawingWindow = false;
 					}
 
-					pixelNo = 7 - ((i - (windowX - 7)) % 8);
-					scanline[i] = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
-					*outputBuffPixel = (bgPalettes[i] >> (scanline[i] * 2)) & 0x3; // Adjust based on palette
-				} else { // Background
-					readTileNum = vram[
-						(lcdcValues[i].bgTileMapOffset ? 0x1C00 : 0x1800) +	// Get start of tile map
-						(((i + scrollX) / 8) & 0x1f) +						// Offset X
-						(32 * (((line + scrollY) & 0xFF) / 8))];			// Offset Y
-					
-					if (lcdcValues[i].tileDataNotOffset) {
-						readData0 = vram[(2 * ((line + scrollY) % 8)) + (readTileNum * 16)];
-						readData1 = vram[(2 * ((line + scrollY) % 8)) + (readTileNum * 16) + 1];
-					} else {
-						readData0 = vram[0x1000 + ((2 * ((line + scrollY) % 8)) + ((int8_t)readTileNum * 16))];
-						readData1 = vram[0x1000 + ((2 * ((line + scrollY) % 8)) + ((int8_t)readTileNum * 16)) + 1];
+					if (drawingWindow) { // Window
+						readTileNum = vram[
+							(lcdcValues[i].windowTileMapOffset ? 0x1C00 : 0x1800) +	// Get start of tile map
+							(((i - (windowX - 7)) / 8) & 0x1f) +						// Offset X
+							(32 * (windowLineCounter / 8))];				// Offset Y
+
+						if (lcdcValues[i].tileDataNotOffset) {
+							readData0 = vram[(2 * (windowLineCounter % 8)) + (readTileNum * 16)];
+							readData1 = vram[(2 * (windowLineCounter % 8)) + (readTileNum * 16) + 1];
+						} else {
+							readData0 = vram[0x1000 + ((2 * (windowLineCounter % 8)) + ((int8_t)readTileNum * 16))];
+							readData1 = vram[0x1000 + ((2 * (windowLineCounter % 8)) + ((int8_t)readTileNum * 16)) + 1];
+						}
+
+						pixelNo = 7 - ((i - (windowX - 7)) % 8);
+						scanline[i] = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
+						*outputBuffPixel = (bgPalettes[i] >> (scanline[i] * 2)) & 0x3; // Adjust based on palette
+					} else { // Background
+						readTileNum = vram[
+							(lcdcValues[i].bgTileMapOffset ? 0x1C00 : 0x1800) +	// Get start of tile map
+							(((i + scrollX) / 8) & 0x1f) +						// Offset X
+							(32 * (((line + scrollY) & 0xFF) / 8))];			// Offset Y
+
+						if (lcdcValues[i].tileDataNotOffset) {
+							readData0 = vram[(2 * ((line + scrollY) % 8)) + (readTileNum * 16)];
+							readData1 = vram[(2 * ((line + scrollY) % 8)) + (readTileNum * 16) + 1];
+						} else {
+							readData0 = vram[0x1000 + ((2 * ((line + scrollY) % 8)) + ((int8_t)readTileNum * 16))];
+							readData1 = vram[0x1000 + ((2 * ((line + scrollY) % 8)) + ((int8_t)readTileNum * 16)) + 1];
+						}
+
+						pixelNo = 7 - ((i + scrollX) % 8);
+						scanline[i] = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
+						*outputBuffPixel = (bgPalettes[i] >> (scanline[i] * 2)) & 0x3; // Adjust based on palette
 					}
 
-					pixelNo = 7 - ((i + scrollX) % 8);
-					scanline[i] = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
-					*outputBuffPixel = (bgPalettes[i] >> (scanline[i] * 2)) & 0x3; // Adjust based on palette
+					if (!lcdcValues[i].bgWindowEnable) {
+						*outputBuffPixel = backgroundPalette & 3;
+					}
 				}
 
-				if (!lcdcValues[i].bgWindowEnable) {
-					*outputBuffPixel = backgroundPalette & 3;
+				if (bus.system == SYSTEM_DMG) {
+					// Insertion sort by X coordinate "adapted" from tutorialspoint
+					OamEntry key;
+					int j;
+					for (int i = 0; i < oamBufferSize; i++) {
+						key.raw = oamBuffer[i].raw;
+						j = i;
+						while (j > 0 && oamBuffer[j-1].xPos <= key.xPos) {
+							oamBuffer[j] = oamBuffer[j - 1];
+							j--;
+						}
+						oamBuffer[j].raw = key.raw;
+					}
 				}
-			}
-			
-			if (bus.system == SYSTEM_DMG) {
-				// Insertion sort by X coordinate "adapted" from tutorialspoint
-				OamEntry key;
-				int j;
 				for (int i = 0; i < oamBufferSize; i++) {
-					key.raw = oamBuffer[i].raw;
-					j = i;
-					while (j > 0 && oamBuffer[j-1].xPos <= key.xPos) {
-						oamBuffer[j] = oamBuffer[j - 1];
-						j--;
-					}
-					oamBuffer[j].raw = key.raw;
-				}
-			}
-			for (int i = 0; i < oamBufferSize; i++) {
-				if (oamBuffer[i].xPos >= 168)
-					continue;
-
-				readTileNum = oamBuffer[i].tileIndex;
-				if (lcdc.objSize) { // Special things for 8x16 tiles
-					readTileNum = oamBuffer[i].tileIndex & ~1; // Ignore first bit
-					if (((line - (oamBuffer[i].yPos - 16)) % 16) > 7)
-						readTileNum += 1;
-					if (oamBuffer[i].yFlip) // Swap fetched tile when y flipped
-						readTileNum ^= 1;
-				}
-
-				if (oamBuffer[i].yFlip) {
-					readData0 = vram[(2 * (7 - ((line - (oamBuffer[i].yPos - 16)) % 8))) + (readTileNum * 16)];
-					readData1 = vram[(2 * (7 - ((line - (oamBuffer[i].yPos - 16)) % 8))) + (readTileNum * 16) + 1];
-				} else {
-					readData0 = vram[(2 * ((line - (oamBuffer[i].yPos - 16)) % 8)) + (readTileNum * 16)];
-					readData1 = vram[(2 * ((line - (oamBuffer[i].yPos - 16)) % 8)) + (readTileNum * 16) + 1];
-				}
-
-				for (int j = 0; j < 8; j++) {
-					uint8_t pixelColor;
-					int pixelX = ((oamBuffer[i].xPos - 8) + j);
-
-					// Make sure pixel is on screen
-					if ((pixelX >= 160) || (pixelX < 0) || !lcdcValues[pixelX].objEnable)
+					if (oamBuffer[i].xPos >= 168)
 						continue;
 
-					pixelNo = oamBuffer[i].xFlip ? j : (7 - j);
-					pixelColor = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
-					// Adjust based on palette
-					bool pixelTransparent = (pixelColor == 0) ? true : false;
-					if (oamBuffer[i].paletteDMG) {
-						pixelColor = (objectPalette1 >> (pixelColor * 2)) & 0x3;
+					readTileNum = oamBuffer[i].tileIndex;
+					if (lcdc.objSize) { // Special things for 8x16 tiles
+						readTileNum = oamBuffer[i].tileIndex & ~1; // Ignore first bit
+						if (((line - (oamBuffer[i].yPos - 16)) % 16) > 7)
+							readTileNum += 1;
+						if (oamBuffer[i].yFlip) // Swap fetched tile when y flipped
+							readTileNum ^= 1;
+					}
+
+					if (oamBuffer[i].yFlip) {
+						readData0 = vram[(2 * (7 - ((line - (oamBuffer[i].yPos - 16)) % 8))) + (readTileNum * 16)];
+						readData1 = vram[(2 * (7 - ((line - (oamBuffer[i].yPos - 16)) % 8))) + (readTileNum * 16) + 1];
 					} else {
-						pixelColor = (objectPalette0 >> (pixelColor * 2)) & 0x3;
+						readData0 = vram[(2 * ((line - (oamBuffer[i].yPos - 16)) % 8)) + (readTileNum * 16)];
+						readData1 = vram[(2 * ((line - (oamBuffer[i].yPos - 16)) % 8)) + (readTileNum * 16) + 1];
 					}
 
-					if (oamBuffer[i].priority) { // Background/window have priority
-						if (scanline[pixelX] == 0) {
-							objScanline[pixelX] = pixelColor;
-							objScanlineTransparent[pixelX] = false;
-						}
-						if (pixelTransparent)
-							objScanlineTransparent[pixelX] = true;
-					} else { // Object has priority
-						if (!pixelTransparent) {
-							objScanline[pixelX] = pixelColor;
-							objScanlineTransparent[pixelX] = false;
+					for (int j = 0; j < 8; j++) {
+						uint8_t pixelColor;
+						int pixelX = ((oamBuffer[i].xPos - 8) + j);
+
+						// Make sure pixel is on screen
+						if ((pixelX >= 160) || (pixelX < 0) || !lcdcValues[pixelX].objEnable)
+							continue;
+
+						pixelNo = oamBuffer[i].xFlip ? j : (7 - j);
+						pixelColor = ((readData0 & (1 << pixelNo)) >> pixelNo) | (((readData1 & (1 << pixelNo)) >> pixelNo) << 1);
+						// Adjust based on palette
+						bool pixelTransparent = (pixelColor == 0) ? true : false;
+						if (oamBuffer[i].paletteDMG) {
+							pixelColor = (objectPalette1 >> (pixelColor * 2)) & 0x3;
 						} else {
-							objScanlineTransparent[pixelX] = true;
+							pixelColor = (objectPalette0 >> (pixelColor * 2)) & 0x3;
+						}
+
+						if (oamBuffer[i].priority) { // Background/window have priority
+							if (scanline[pixelX] == 0) {
+								objScanline[pixelX] = pixelColor;
+								objScanlineTransparent[pixelX] = false;
+							}
+							if (pixelTransparent)
+								objScanlineTransparent[pixelX] = true;
+						} else { // Object has priority
+							if (!pixelTransparent) {
+								objScanline[pixelX] = pixelColor;
+								objScanlineTransparent[pixelX] = false;
+							} else {
+								objScanlineTransparent[pixelX] = true;
+							}
 						}
 					}
 				}
-			}
-			for (int i = 0; i < 160; i++) {
-				//printf("%d", scanline[i]);
-				if (!objScanlineTransparent[i]) {
-					//printf("t");
-					outputFramebuffer[(line * 160) + i] = objScanline[i];
+				for (int i = 0; i < 160; i++) {
+					if (!objScanlineTransparent[i]) {
+						outputFramebuffer[(line * 160) + i] = objScanline[i];
+					}
 				}
+				setMode(PPU_HBLANK);
 			}
-			//printf("\n");
-			setMode(PPU_HBLANK);
-		}
-		break;
-	case PPU_HBLANK: // HBlank
-		if (lineCycle >= 456)
-			setMode(PPU_OAM_TRANSFER);
-		break;
-	case PPU_VBLANK: // VBlank
-		// Update line counter
-		if (!((modeCycle + 1) % 456) && (line <= 153)) {
-			++line;
-			checkLCDStatusForInterrupt();
-		}
-		if (line == 154) {
-			line = -1;
-			windowLineCounter = 0;
-			windowTriggeredThisFrame = false;
-			frameDone = true;
-			//printf("Frame took %d cycles.\n", frameCycle + 1);
-			frameCycle = -1;
-			setMode(PPU_OAM_TRANSFER);
-		}
-		break;
-	default:
-		break;
-	};
+			break;
+		case PPU_HBLANK: // HBlank
+			if (lineCycle >= 456)
+				setMode(PPU_OAM_TRANSFER);
+			break;
+		case PPU_VBLANK: // VBlank
+			// Update line counter
+			if (!((modeCycle + 1) % 456) && (line <= 153)) {
+				++line;
+				checkLCDStatusForInterrupt();
+			}
+			if (line == 154) {
+				line = -1;
+				windowLineCounter = 0;
+				windowTriggeredThisFrame = false;
+				frameDone = true;
+				setMode(PPU_OAM_TRANSFER);
+			}
+			break;
+		default:
+			break;
+		};
 
-	// Increment the cycle counter
-	++modeCycle;
-	++lineCycle;
-	++frameCycle;
+		// Increment the cycle counter
+		++modeCycle;
+		++lineCycle;
+	}
 
 	return;
 }
@@ -332,7 +329,7 @@ void GameboyPPU::setMode(enum ppuModes newMode) {
 		// Using nothing
 		oamEnable = true;
 		vramEnable = true;
-		
+
 		mode = PPU_HBLANK;
 		modeCycle = -1;
 		break;
@@ -404,7 +401,7 @@ void GameboyPPU::checkLCDStatusForInterrupt() {
 		conditionsMet = true;
 	if (interruptHBlank && (mode == PPU_HBLANK))
 		conditionsMet = true;
-	
+
 	if (!conditionsMetPrevious && conditionsMet) // STAT blocking
 		bus.cpu.requestInterrupt(INT_LCD);
 

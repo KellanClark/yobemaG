@@ -8,9 +8,9 @@ Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (
 void Gameboy::cycleSystem() {
 	timer.cycle();
 	for (int i = 0; i < 4; i++) {
-		apu.cycle(); // Not implemented
-		ppu.cycle();
+		apu.cycle();
 	}
+	ppu.cycle();
 	if (dmaCyclesLeft)
 		--dmaCyclesLeft;
 	if (oamDMAState == WAITING_FOR_DMA)

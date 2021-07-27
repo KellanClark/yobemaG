@@ -7,11 +7,11 @@ SRCS := $(shell find $(SRC_DIRS) -name *.cpp -or -name *.c -or -name *.s)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 
-INC_DIRS := $(shell find $(SRC_DIRS) -type d) include
+INC_DIRS := $(shell find $(SRC_DIRS) -type d) include include/imgui
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -Wall -std=c++2a #-g -fsanitize=address -fsanitize=leak -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all
-LDFLAGS := -lstdc++ -lSDL2 -ldl #-fsanitize=address -fsanitize=leak -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all
+LDFLAGS := -lstdc++ -lSDL2 -ldl -lGL -lm #-fsanitize=address -fsanitize=leak -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all
 
 
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
