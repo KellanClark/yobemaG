@@ -56,4 +56,5 @@ dkms.conf
 .vscode
 *.sav
 *.wav
+imgui.ini
 build/

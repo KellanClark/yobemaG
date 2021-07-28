@@ -4,7 +4,6 @@
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
 #include <SDL.h>
-
 #include <GL/gl3w.h>
 
 #include "gameboy.hpp"
@@ -79,7 +78,7 @@ int main(int argc, char *argv[]) {
 			argRomFilePath = argv[i];
 			break;
 		case cexprHash("--bootrom"):
-			if (argc == (++i)) {
+			if (argc == ++i ) {
 				printf("Not enough arguments for flag --bootrom\n");
 				return -1;
 			}
@@ -92,9 +91,11 @@ int main(int argc, char *argv[]) {
 				return -1;
 			}
 			switch (cexprHash(argv[i])) {
+			case cexprHash("gb"):
 			case cexprHash("dmg"):
 				argSystem = SYSTEM_DMG;
 				break;
+			case cexprHash("gbc"):
 			case cexprHash("cgb"):
 				argSystem = SYSTEM_CGB;
 				break;
@@ -126,9 +127,38 @@ int main(int argc, char *argv[]) {
 		printf("Bootrom File Name:  %s\n", argBootromFilePath.c_str());
 	if (emulator.rom.load(argRomFilePath, argBootromFilePath, argSystem))
 		return -1;
+	
+	// Print info about cartridge
+	printf("Rom File Name:  %s\n", argRomFilePath.c_str());
+	printf("File Size:  %d\n", (int)emulator.rom.romBuff.size());
+	printf("Rom Name:  %s\n", emulator.rom.name.c_str());
+	printf("External ROM Banks:  %d\n", emulator.rom.extROMBanks);
+	printf("External ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
+	printf("Game Supports DMG:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
+	printf("Game Supports CGB:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
+	printf("Game Supports SGB Features:  %s\n", (emulator.rom.sgbSupported ? "True" : "False"));
+	printf("Memory Bank Controller:  %s\n", emulator.rom.mbcString);
+	printf("Game Has Save Battery:  %s\n", (emulator.rom.saveBatteryEnabled ? "True" : "False"));
+	printf("Game Has Real Time Clock:  %s\n", (emulator.rom.rtcEnabled ? "True" : "False"));
+	printf("External RAM Banks:  %d\n", emulator.rom.extRAMBanks);
+	printf("External RAM Size:  %d\n", emulator.rom.extRAMBanks * 8 * 1024);
+
+	// Initalize some values
+	serialData = 0;
+	serialControl = 0;
+	joypadButtons.value = 0xFF;
+
+	/* Temporary hex viewer
+	for (int i = 0; i < 0x400; i += 16) {
+		printf("%04X: ", i);
+		for (int j = 0; j < 16; j++) {
+			printf(" %02X", emulator.rom.romBuff[i+j]);
+		}
+		printf("\n");
+	}*/
 
 	// Setup SDL
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER)) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER)) {
 		printf("Error: %s\n", SDL_GetError());
 		return -1;
 	}
@@ -150,6 +180,18 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	// Setup Audio
+	desiredAudioSpec = {
+		.freq = 48000,
+		.format = AUDIO_S16,
+		.channels = 2,
+		.samples = 1024,
+		.callback = NULL
+	};
+	audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredAudioSpec, &audioSpec, 0);
+	SDL_PauseAudioDevice(audioDevice, 0);
+	//emulator.apu.sampleRate = audioSpec.freq;
+
 	// Setup ImGui
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -167,12 +209,12 @@ int main(int argc, char *argv[]) {
 
 	// Create image for main display
 	GLuint lcdTexture;
-    glGenTextures(1, &lcdTexture);
-    glBindTexture(GL_TEXTURE_2D, lcdTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+	glGenTextures(1, &lcdTexture);
+	glBindTexture(GL_TEXTURE_2D, lcdTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); // GL_LINEAR
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	/*uint8_t colors[4][4] = {
 		{155, 188,  15, 255},
@@ -402,7 +444,7 @@ int main(int argc, char *argv[]) {
 
 	/* Cleanup */
 
-	// Audio device/WAV file
+	// WAV file
 	struct  __attribute__((__packed__)) {
 		char riffStr[4] = {'R', 'I', 'F', 'F'};
 		unsigned int fileSize = 0;
@@ -424,7 +466,6 @@ int main(int argc, char *argv[]) {
 	wavFileStream.write(reinterpret_cast<const char*>(&wavHeaderData), sizeof(wavHeaderData));
 	wavFileStream.write(reinterpret_cast<const char*>(wavFileData.data()), wavFileData.size() * sizeof(int16_t));
 	wavFileStream.close();
-	SDL_CloseAudioDevice(audioDevice);
 
 	// ImGui
 	ImGui_ImplOpenGL3_Shutdown();
@@ -432,6 +473,7 @@ int main(int argc, char *argv[]) {
 	ImGui::DestroyContext();
 
 	// SDL
+	SDL_CloseAudioDevice(audioDevice);
 	SDL_GL_DeleteContext(gl_context);
 	SDL_DestroyWindow(window);
 	SDL_Quit();

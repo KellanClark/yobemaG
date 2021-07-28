@@ -18,7 +18,7 @@ Compile using `make` and run the file in `build/` The path of the rom can be giv
 
 Optional Arguments:
 * `--bootrom <file>` Use a file as the bootrom. CPU registers will be set to correct values if not given.
-* `--system <dmg, cgb>` Specify which CPU to use. 
+* `--system <dmg/gb, cgb/gbc>` Specify which CPU to use. 
 * `--log-to-console` Log values of each CPU register to console after every instruction. WARNING: May drastically slow down emulator. It is recommended to pipe the output into a file.
 
 Example: `yobemag Tetris.gb --bootrom bootrom.bin`
