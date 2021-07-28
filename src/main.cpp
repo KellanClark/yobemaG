@@ -1,14 +1,13 @@
 
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_sdl.h"
-#include "imgui/imgui_impl_opengl3.h"
-#include <SDL2/SDL.h>
-#include "glad/glad.h"
+#include "imgui.h"
+#include "imgui_impl_sdl.h"
+#include "imgui_impl_opengl3.h"
+#include <stdio.h>
+#include <SDL.h>
+
+#include <GL/gl3w.h>
 
 #include "gameboy.hpp"
-
-#define SCREEN_WIDTH 160*4
-#define SCREEN_HEIGHT 144*4
 
 bool argRomGiven;
 std::filesystem::path argRomFilePath;
@@ -128,90 +127,59 @@ int main(int argc, char *argv[]) {
 	if (emulator.rom.load(argRomFilePath, argBootromFilePath, argSystem))
 		return -1;
 
-	// Print info about cartridge
-	printf("Rom File Name:  %s\n", argRomFilePath.c_str());
-	printf("File Size:  %d\n", (int)emulator.rom.romBuff.size());
-	printf("Rom Name:  %s\n", emulator.rom.name.c_str());
-	printf("External ROM Banks:  %d\n", emulator.rom.extROMBanks);
-	printf("External ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
-	printf("Game Supports DMG:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
-	printf("Game Supports CGB:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
-	printf("Game Supports SGB Features:  %s\n", (emulator.rom.sgbSupported ? "True" : "False"));
-	printf("Memory Bank Controller:  %s\n", emulator.rom.mbcString);
-	printf("Game Has Save Battery:  %s\n", (emulator.rom.saveBatteryEnabled ? "True" : "False"));
-	printf("Game Has Real Time Clock:  %s\n", (emulator.rom.rtcEnabled ? "True" : "False"));
-	printf("External RAM Banks:  %d\n", emulator.rom.extRAMBanks);
-	printf("External RAM Size:  %d\n", emulator.rom.extRAMBanks * 8 * 1024);
-
-	// Initalize some values
-	serialData = 0;
-	serialControl = 0;
-	joypadButtons.value = 0xFF;
-
-	/* Temporary hex viewer
-	for (int i = 0; i < 0x400; i += 16) {
-		printf("%04X: ", i);
-		for (int j = 0; j < 16; j++) {
-			printf(" %02X", emulator.rom.romBuff[i+j]);
-		}
-		printf("\n");
-	}*/
-
-	// Start SDL
-	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+	// Setup SDL
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER)) {
+		printf("Error: %s\n", SDL_GetError());
+		return -1;
+	}
+	const char* glsl_version = "#version 130";
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-	std::string windowName = "yobemaG - ";
-	windowName += emulator.rom.name.c_str();
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_WindowFlags windowFlags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-	SDL_Window *window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, windowFlags);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+	SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
 	SDL_GLContext gl_context = SDL_GL_CreateContext(window);
-    SDL_GL_MakeCurrent(window, gl_context);
-	gladLoadGL();
-	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
-	// Audio
-	desiredAudioSpec = {
-		.freq = 48000,
-		.format = AUDIO_S16,
-		.channels = 2,
-		.samples = 1024,
-		.callback = NULL
-	};
-	audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredAudioSpec, &audioSpec, 0);
-	SDL_PauseAudioDevice(audioDevice, 0);
-	emulator.apu.sampleRate = audioSpec.freq;
-	// Create texture for drawing to screen
-	SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STATIC, 160, 144);
+	SDL_GL_MakeCurrent(window, gl_context);
+	SDL_GL_SetSwapInterval(1); // Enable vsync
+	if (gl3wInit()) {
+		printf("Failed to initialize OpenGL loader!\n");
+		return 1;
+	}
 
-	// WAV file
-	struct  __attribute__((__packed__)) {
-		char riffStr[4] = {'R', 'I', 'F', 'F'};
-		unsigned int fileSize = 0;
-		char waveStr[4] = {'W', 'A', 'V', 'E'};
-		char fmtStr[4] = {'f', 'm', 't', ' '};
-		unsigned int subchunk1Size = 16;
-		unsigned short audioFormat = 1;
-		unsigned short numChannels = 2;
-		unsigned int sampleRate = 48000;
-		unsigned int byteRate = 48000 * 2 * 2;
-		unsigned short blockAlign = 4;
-		unsigned short bitsPerSample = 16;
-		char dataStr[4] = {'d', 'a', 't', 'a'};
-		unsigned int subchunk2Size = 0;
-	} wavHeaderData;
-	wavFileStream.open("output.wav", std::ios::binary | std::ios::trunc);
+	// Setup ImGui
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;	 // Enable Keyboard Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;	  // Enable Gamepad Controls
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsClassic();
+	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+	ImGui_ImplOpenGL3_Init(glsl_version);
 
-	/*SDL_Color colors[4] = {
+	bool showDemoWindow = true;
+	bool showAnotherWindow = false;
+	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+	// Create image for main display
+	GLuint lcdTexture;
+    glGenTextures(1, &lcdTexture);
+    glBindTexture(GL_TEXTURE_2D, lcdTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+
+	/*uint8_t colors[4][4] = {
 		{155, 188,  15, 255},
 		{139, 172,  15, 255},
 		{ 48,  98,  48, 255},
 		{ 15,  56,  15, 255}};*/
-	SDL_Color colors[4] = {
+	uint8_t colors[4][4] = {
 		{255, 255, 255, 255},
 		{170, 170, 170, 255},
 		{ 85,  85,  85, 255},
@@ -220,20 +188,24 @@ int main(int argc, char *argv[]) {
 	memset(pixels, 0, sizeof(pixels));
 	memset(emulator.ppu.outputFramebuffer, 0, 160 * 144 * sizeof(uint8_t));
 
+	// Main loop
 	bool debug = false;
 	bool unlockFramerate = false;
-	bool quit = false;
 	SDL_Event event;
-	while (!quit) {
+	bool done = false;
+	while (!done) {
 		unsigned int frameStartTicks = SDL_GetTicks();
 
-		// Handle keypresses and other events
-		while(SDL_PollEvent(&event) != 0) {
+		while (SDL_PollEvent(&event)) {
+			ImGui_ImplSDL2_ProcessEvent(&event);
+
 			bool directionButtonPressed;
 			bool actionButtonPressed;
+			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
+				done = true;
 			switch (event.type) {
 			case SDL_QUIT:
-				quit = true;
+				done = true;
 				break;
 			case SDL_KEYDOWN:
 				directionButtonPressed = false;
@@ -360,28 +332,107 @@ int main(int argc, char *argv[]) {
 		// Convert framebuffer to screen colors
 		for (int i = 0; i < (160 * 144); i++) {
 			uint8_t color = emulator.ppu.outputFramebuffer[i];
-			pixels[i] = (colors[color].r << 24) | (colors[color].g << 16) | (colors[color].b << 8);
+			pixels[i] = (colors[color][0] << 24) | (colors[color][1] << 16) | (colors[color][2] << 8) | 255;
+		}
+		glBindTexture(GL_TEXTURE_2D, lcdTexture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 160, 144, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, pixels);
+
+		/* Draw ImGui Frame */
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplSDL2_NewFrame();
+		ImGui::NewFrame();
+
+		if (showDemoWindow)
+			ImGui::ShowDemoWindow(&showDemoWindow);
+
+		// Gameboy Screen
+		{
+			ImGui::Begin("Gameboy Screen");
+
+			ImGui::Text("Here's some sample text.");
+			ImGui::Image((void*)(intptr_t)lcdTexture, ImVec2(160*2, 144*2));
+
+			ImGui::End();
 		}
 
-		// Draw everything on the screen
-		SDL_UpdateTexture(texture, NULL, pixels, 160 * sizeof(uint32_t));
-		SDL_RenderClear(renderer);
-		SDL_RenderCopy(renderer, texture, NULL, NULL);
-		SDL_RenderPresent(renderer);
+		// Example Window
+		{
+			static float f = 0.0f;
+			static int counter = 0;
 
-		if (!unlockFramerate) {
+			ImGui::Begin("Hello, world!");						  // Create a window called "Hello, world!" and append into it.
+
+			ImGui::Text("This is some useful text.");			   // Display some text (you can use a format strings too)
+			ImGui::Checkbox("Demo Window", &showDemoWindow);	  // Edit bools storing our window open/close state
+			ImGui::Checkbox("Another Window", &showAnotherWindow);
+
+			ImGui::SliderFloat("float", &f, 0.0f, 1.0f);			// Edit 1 float using a slider from 0.0f to 1.0f
+			ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+			if (ImGui::Button("Button"))							// Buttons return true when clicked (most widgets return true when edited/activated)
+				counter++;
+			ImGui::SameLine();
+			ImGui::Text("counter = %d", counter);
+
+			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			ImGui::End();
+
+			if (showAnotherWindow) {
+				ImGui::Begin("Another Window", &showAnotherWindow);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+				ImGui::Text("Hello from another window!");
+				if (ImGui::Button("Close Me"))
+					showAnotherWindow = false;
+				ImGui::End();
+			}
+		}
+
+		// Rendering
+		ImGui::Render();
+		glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+		glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+		glClear(GL_COLOR_BUFFER_BIT);
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		SDL_GL_SwapWindow(window);
+
+		if (!unlockFramerate && 0) {
 			while ((SDL_GetTicks() - frameStartTicks) < (1000 / 60));
 				//sleep(1);
 		}
 	}
 
+	/* Cleanup */
+
+	// Audio device/WAV file
+	struct  __attribute__((__packed__)) {
+		char riffStr[4] = {'R', 'I', 'F', 'F'};
+		unsigned int fileSize = 0;
+		char waveStr[4] = {'W', 'A', 'V', 'E'};
+		char fmtStr[4] = {'f', 'm', 't', ' '};
+		unsigned int subchunk1Size = 16;
+		unsigned short audioFormat = 1;
+		unsigned short numChannels = 2;
+		unsigned int sampleRate = 48000;
+		unsigned int byteRate = 48000 * 2 * 2;
+		unsigned short blockAlign = 4;
+		unsigned short bitsPerSample = 16;
+		char dataStr[4] = {'d', 'a', 't', 'a'};
+		unsigned int subchunk2Size = 0;
+	} wavHeaderData;
+	wavFileStream.open("output.wav", std::ios::binary | std::ios::trunc);
 	wavHeaderData.subchunk2Size = (wavFileData.size() * sizeof(int16_t));
 	wavHeaderData.fileSize = sizeof(wavHeaderData) - 8 + wavHeaderData.subchunk2Size;
 	wavFileStream.write(reinterpret_cast<const char*>(&wavHeaderData), sizeof(wavHeaderData));
 	wavFileStream.write(reinterpret_cast<const char*>(wavFileData.data()), wavFileData.size() * sizeof(int16_t));
 	wavFileStream.close();
-
 	SDL_CloseAudioDevice(audioDevice);
+
+	// ImGui
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplSDL2_Shutdown();
+	ImGui::DestroyContext();
+
+	// SDL
+	SDL_GL_DeleteContext(gl_context);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 
