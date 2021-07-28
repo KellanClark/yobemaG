@@ -56,6 +56,10 @@ Gameboy emulator(&joypadWriteCallback, &joypadReadCallback,
 				&serialWriteCallback, &serialReadCallback,
 				&sampleBufferCallback);
 
+bool var1;
+bool var2;
+bool var3;
+
 int main(int argc, char *argv[]) {
 	// Parse arguments
 	if (argc < 2) {
@@ -386,6 +390,22 @@ int main(int argc, char *argv[]) {
 
 		if (showDemoWindow)
 			ImGui::ShowDemoWindow(&showDemoWindow);
+
+		{
+			ImGui::BeginMainMenuBar();
+
+			if (ImGui::BeginMenu("Menu")) {
+				ImGui::MenuItem("Test 1", NULL, &var1);
+				ImGui::MenuItem("Test 2", NULL, &var2);
+				ImGui::EndMenu();
+			}
+			if (ImGui::BeginMenu("Menu 2")) {
+				ImGui::MenuItem("Test 3", NULL, &var3);
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndMainMenuBar();
+		}
 
 		// Gameboy Screen
 		{
