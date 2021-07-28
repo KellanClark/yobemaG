@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
 	};
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredAudioSpec, &audioSpec, 0);
 	SDL_PauseAudioDevice(audioDevice, 0);
-	//emulator.apu.sampleRate = audioSpec.freq;
+	emulator.apu.sampleRate = audioSpec.freq;
 
 	// Setup Native File Dialog
 	NFD_Init();
@@ -479,10 +479,10 @@ int main(int argc, char *argv[]) {
 		unsigned int subchunk1Size = 16;
 		unsigned short audioFormat = 1;
 		unsigned short numChannels = 2;
-		unsigned int sampleRate = 48000;
-		unsigned int byteRate = 48000 * 2 * 2;
+		unsigned int sampleRate = audioSpec.freq;
+		unsigned int byteRate = audioSpec.freq * sizeof(int16_t) * 2;
 		unsigned short blockAlign = 4;
-		unsigned short bitsPerSample = 16;
+		unsigned short bitsPerSample = sizeof(int16_t) * 8;
 		char dataStr[4] = {'d', 'a', 't', 'a'};
 		unsigned int subchunk2Size = 0;
 	} wavHeaderData;
