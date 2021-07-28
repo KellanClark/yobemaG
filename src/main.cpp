@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <SDL2/SDL.h>
 #include <GL/gl3w.h>
+#include <nfd.h>
 
 #include "gameboy.hpp"
 
@@ -197,6 +198,9 @@ int main(int argc, char *argv[]) {
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredAudioSpec, &audioSpec, 0);
 	SDL_PauseAudioDevice(audioDevice, 0);
 	//emulator.apu.sampleRate = audioSpec.freq;
+
+	// Setup Native File Dialog
+	NFD_Init();
 
 	// Setup ImGui
 	IMGUI_CHECKVERSION();
@@ -493,6 +497,9 @@ int main(int argc, char *argv[]) {
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();
+
+	// Native File Dialog
+	NFD_Quit();
 
 	// SDL
 	SDL_CloseAudioDevice(audioDevice);

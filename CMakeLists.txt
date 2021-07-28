@@ -11,6 +11,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 find_package(SDL2 REQUIRED)
 
+add_subdirectory(modules/nativefiledialog-extended)
+
 include_directories(
 	${PROJECT_SOURCE_DIR}/include/
 	${SDL2_INCLUDE_DIRS}
@@ -54,6 +56,7 @@ target_compile_options(yobemag PRIVATE
 
 target_link_libraries(yobemag PRIVATE
 	${SDL2_LIBRARIES}
+	nfd
 	-lstdc++
 	-lSDL2
 	-ldl
