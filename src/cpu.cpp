@@ -2,13 +2,15 @@
 #include "../include/gameboy.hpp"
 
 GameboyCPU::GameboyCPU(Gameboy& bus_) : SM83(bus_) {
+	reset();
+}
+
+void GameboyCPU::reset() {
 	memset(highRam, 0, 127); // Clear high ram
 
 	counter=interruptRequests=enabledInterrupts = 0; // Clear variables
 	stopped=halted = false;
 	interruptMasterEnable = false;
-
-	return;
 }
 
 int GameboyCPU::cycle() {

@@ -2,7 +2,17 @@
 #include "gameboy.hpp"
 
 Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t), void (*apuSampleBufferFull)()) : rom(*this), cpu(*this), ppu(*this), ram(*this), timer(*this), apu(*this, apuSampleBufferFull), joypadWrite(joypadWrite_), joypadRead(joypadRead_), serialWrite(serialWrite_), serialRead(serialRead_) {
-	dmaCyclesLeft=undocumented1=undocumented2=undocumented3=undocumented4 = 0;
+	reset();
+}
+
+void Gameboy::reset() {
+	cpu.reset();
+
+	dmaCyclesLeft = 0;
+	undocumented1 = 0;
+	undocumented2 = 0;
+	undocumented3 = 0;
+	undocumented4 = 0;
 }
 
 void Gameboy::cycleSystem() {

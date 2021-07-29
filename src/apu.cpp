@@ -91,6 +91,7 @@ void GameboyAPU::cycle() {
 				}
 			}
 			if (channel4.periodTimer) {
+				//printf("0x%02X\n", channel4.currentVolume);
 				if ((--channel4.periodTimer) == 0) {
 					channel4.periodTimer = channel4.envelopeSweepNum;
 					if ((channel4.currentVolume < 0xF) && channel4.envelopeIncrease) {
@@ -149,8 +150,8 @@ void GameboyAPU::cycle() {
 		sampleCounter -= 4194304;
 
 		// Sample each channel
-		int16_t ch1Sample = soundControl.ch1On * 0;//(((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) - 7) / 7) * 0x7FFF;
-		int16_t ch2Sample = soundControl.ch2On * 0;//(((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) - 7) / 7) * 0x7FFF;
+		int16_t ch1Sample = soundControl.ch1On * (((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) - 7) / 7) * 0x7FFF;
+		int16_t ch2Sample = soundControl.ch2On * (((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) - 7) / 7) * 0x7FFF;
 		int16_t ch3Sample = soundControl.ch3On * 0;
 		int16_t ch4Sample = soundControl.ch4On * (((channel4.currentVolume * ((~channel4.lfsr) & 1)) - 7) / 7) * 0x7FFF;
 

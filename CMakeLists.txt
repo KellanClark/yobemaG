@@ -45,13 +45,13 @@ target_compile_options(yobemag PRIVATE
 	-MMD
 	-MP
 	-Wall
-#[[	-g
+	-g
 	-fsanitize=address
 	-fsanitize=leak
 	-fsanitize=undefined
 	-fsanitize=pointer-compare
 	-fsanitize=pointer-subtract
-	-fstack-protector-all]]
+	-fstack-protector-all
 )
 
 target_link_libraries(yobemag PRIVATE
@@ -62,10 +62,10 @@ target_link_libraries(yobemag PRIVATE
 	-ldl
 	-lGL
 	-lm
-#[[	-fsanitize=address
+	-fsanitize=address
 	-fsanitize=leak
 	-fsanitize=undefined
 	-fsanitize=pointer-compare
 	-fsanitize=pointer-subtract
-	-fstack-protector-all]]
+	-fstack-protector-all
 )

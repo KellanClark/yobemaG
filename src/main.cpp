@@ -5,10 +5,12 @@
 #include <stdio.h>
 #include <SDL2/SDL.h>
 #include <GL/gl3w.h>
-#include <nfd.h>
+#include <nfd.hpp>
 
 #include "gameboy.hpp"
 
+// Argument Variables
+NFD::Guard nfdGuard;
 bool argRomGiven;
 std::filesystem::path argRomFilePath;
 bool argBootromGiven;
@@ -57,16 +59,21 @@ Gameboy emulator(&joypadWriteCallback, &joypadReadCallback,
 				&serialWriteCallback, &serialReadCallback,
 				&sampleBufferCallback);
 
+int loadRomFromFile();
+
+// ImGui Windows
+void mainMenuBar();
+
 bool var1;
 bool var2;
 bool var3;
 
 int main(int argc, char *argv[]) {
 	// Parse arguments
-	if (argc < 2) {
+	/*if (argc < 2) {
 		printf("Not enough arguments.\n");
 		return -1;
-	}
+	}*/
 	argRomGiven = false;
 	argBootromGiven = false;
 	argBootromFilePath = "";
@@ -122,31 +129,18 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	}
-	if (!argRomGiven) {
+	/*if (!argRomGiven) {
 		printf("No ROM given.");
 		return -1;
-	}
+	}*/
 
-	// Load cartridge
 	if (argBootromGiven)
 		printf("Bootrom File Name:  %s\n", argBootromFilePath.c_str());
-	if (emulator.rom.load(argRomFilePath, argBootromFilePath, argSystem))
-		return -1;
-	
-	// Print info about cartridge
-	printf("Rom File Name:  %s\n", argRomFilePath.c_str());
-	printf("File Size:  %d\n", (int)emulator.rom.romBuff.size());
-	printf("Rom Name:  %s\n", emulator.rom.name.c_str());
-	printf("External ROM Banks:  %d\n", emulator.rom.extROMBanks);
-	printf("External ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
-	printf("Game Supports DMG:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
-	printf("Game Supports CGB:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
-	printf("Game Supports SGB Features:  %s\n", (emulator.rom.sgbSupported ? "True" : "False"));
-	printf("Memory Bank Controller:  %s\n", emulator.rom.mbcString);
-	printf("Game Has Save Battery:  %s\n", (emulator.rom.saveBatteryEnabled ? "True" : "False"));
-	printf("Game Has Real Time Clock:  %s\n", (emulator.rom.rtcEnabled ? "True" : "False"));
-	printf("External RAM Banks:  %d\n", emulator.rom.extRAMBanks);
-	printf("External RAM Size:  %d\n", emulator.rom.extRAMBanks * 8 * 1024);
+	if (argRomGiven) {
+		if (loadRomFromFile() == -1) {
+			return -1;
+		}
+	}
 
 	// Initalize some values
 	serialData = 0;
@@ -199,9 +193,6 @@ int main(int argc, char *argv[]) {
 	SDL_PauseAudioDevice(audioDevice, 0);
 	emulator.apu.sampleRate = audioSpec.freq;
 
-	// Setup Native File Dialog
-	NFD_Init();
-
 	// Setup ImGui
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -231,14 +222,14 @@ int main(int argc, char *argv[]) {
 		{139, 172,  15, 255},
 		{ 48,  98,  48, 255},
 		{ 15,  56,  15, 255}};*/
-	uint8_t colors[4][4] = {
-		{255, 255, 255, 255},
-		{170, 170, 170, 255},
-		{ 85,  85,  85, 255},
-		{  0,   0,   0, 255}};
+	uint32_t colors[4] = {
+		(uint32_t)((255 << 24) | (255 << 16) | (255 << 8) | 255),
+		(uint32_t)((170 << 24) | (170 << 16) | (170 << 8) | 255),
+		(uint32_t)(( 85 << 24) | ( 85 << 16) | ( 85 << 8) | 255),
+		(uint32_t)((  0 << 24) | (  0 << 16) | (  0 << 8) | 255)};
 	uint32_t pixels[160 * 144];
 	memset(pixels, 0, sizeof(pixels));
-	memset(emulator.ppu.outputFramebuffer, 0, 160 * 144 * sizeof(uint8_t));
+	memset(emulator.ppu.outputFramebuffer, 0, sizeof(emulator.ppu.outputFramebuffer));
 
 	// Main loop
 	bool debug = false;
@@ -340,7 +331,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		emulator.ppu.frameDone = false;
-		while (!emulator.ppu.frameDone) {
+		while (!emulator.ppu.frameDone && argRomGiven) {
 			//if (emulator.cpu.r.pc == 0x0098) debug = true;
 			//	printf("0x%04X\n", emulator.cpu.r.pc);
 			if (argLogConsole)
@@ -376,20 +367,19 @@ int main(int argc, char *argv[]) {
 		}
 
 		// Temporary audio bandaid
-		if (emulator.ppu.lcdc.lcdEnable) {
+		if (emulator.ppu.lcdc.lcdEnable && emulator.apu.sampleBufferIndex) {
 			sampleBufferCallback();
 			emulator.apu.sampleBufferIndex = 0;
 		}
 
 		// Convert framebuffer to screen colors
 		for (int i = 0; i < (160 * 144); i++) {
-			uint8_t color = emulator.ppu.outputFramebuffer[i];
-			pixels[i] = (colors[color][0] << 24) | (colors[color][1] << 16) | (colors[color][2] << 8) | 255;
+			pixels[i] = colors[emulator.ppu.outputFramebuffer[i]];
 		}
 		glBindTexture(GL_TEXTURE_2D, lcdTexture);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 160, 144, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, pixels);
 
-		/* Draw ImGui Frame */
+		/* Draw ImGui Stuff */
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
 		ImGui::NewFrame();
@@ -397,21 +387,7 @@ int main(int argc, char *argv[]) {
 		if (showDemoWindow)
 			ImGui::ShowDemoWindow(&showDemoWindow);
 
-		{
-			ImGui::BeginMainMenuBar();
-
-			if (ImGui::BeginMenu("Menu")) {
-				ImGui::MenuItem("Test 1", NULL, &var1);
-				ImGui::MenuItem("Test 2", NULL, &var2);
-				ImGui::EndMenu();
-			}
-			if (ImGui::BeginMenu("Menu 2")) {
-				ImGui::MenuItem("Test 3", NULL, &var3);
-				ImGui::EndMenu();
-			}
-
-			ImGui::EndMainMenuBar();
-		}
+		mainMenuBar();
 
 		// Gameboy Screen
 		{
@@ -454,7 +430,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		// Rendering
+		/* Rendering */
 		ImGui::Render();
 		glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
 		glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
@@ -463,7 +439,7 @@ int main(int argc, char *argv[]) {
 		SDL_GL_SwapWindow(window);
 
 		if (!unlockFramerate && 0) {
-			while ((SDL_GetTicks() - frameStartTicks) < (1000 / 60));
+			while ((SDL_GetTicks() - frameStartTicks) <= ((1000 / 60) - 2));
 				//sleep(1);
 		}
 	}
@@ -498,9 +474,6 @@ int main(int argc, char *argv[]) {
 	ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();
 
-	// Native File Dialog
-	NFD_Quit();
-
 	// SDL
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_GL_DeleteContext(gl_context);
@@ -513,8 +486,6 @@ int main(int argc, char *argv[]) {
 void joypadWriteCallback(uint8_t value) {
 	joypadDirectionSelect = value & 0x10;
 	joypadActionSelect = value & 0x20;
-
-	return;
 }
 
 uint8_t joypadReadCallback() {
@@ -530,7 +501,7 @@ uint8_t joypadReadCallback() {
 
 // Temporary serial implementation for running blargg's tests
 void serialWriteCallback(uint16_t address, uint8_t value) {
-	//return;
+	return;
 
 	if (address == 0xFF01) {
 		serialData = value;
@@ -539,12 +510,10 @@ void serialWriteCallback(uint16_t address, uint8_t value) {
 
 	if (address == 0xFF02)
 		serialControl = value;
-
-	return;
 }
 
 uint8_t serialReadCallback(uint16_t address) {
-	//return 0xFF;
+	return 0xFF;
 
 	if (address == 0xFF01)
 		return serialData;
@@ -558,4 +527,63 @@ uint8_t serialReadCallback(uint16_t address) {
 void sampleBufferCallback() {
 	wavFileData.insert(wavFileData.end(), emulator.apu.sampleBuffer.begin(), emulator.apu.sampleBuffer.begin() + emulator.apu.sampleBufferIndex);
 	SDL_QueueAudio(audioDevice, &emulator.apu.sampleBuffer, emulator.apu.sampleBufferIndex * sizeof(int16_t));
+}
+
+int loadRomFromFile() {
+	emulator.reset();
+
+	if (emulator.rom.load(argRomFilePath, argBootromFilePath, argSystem))
+		return -1;
+
+	// Print info about cartridge
+	printf("Rom File Name:  %s\n", argRomFilePath.c_str());
+	printf("File Size:  %d\n", (int)emulator.rom.romBuff.size());
+	printf("Rom Name:  %s\n", emulator.rom.name.c_str());
+	printf("External ROM Banks:  %d\n", emulator.rom.extROMBanks);
+	printf("External ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
+	printf("Game Supports DMG:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
+	printf("Game Supports CGB:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
+	printf("Game Supports SGB Features:  %s\n", (emulator.rom.sgbSupported ? "True" : "False"));
+	printf("Memory Bank Controller:  %s\n", emulator.rom.mbcString);
+	printf("Game Has Save Battery:  %s\n", (emulator.rom.saveBatteryEnabled ? "True" : "False"));
+	printf("Game Has Real Time Clock:  %s\n", (emulator.rom.rtcEnabled ? "True" : "False"));
+	printf("External RAM Banks:  %d\n", emulator.rom.extRAMBanks);
+	printf("External RAM Size:  %d\n", emulator.rom.extRAMBanks * 8 * 1024);
+
+	return 0;
+}
+
+void mainMenuBar() {
+	ImGui::BeginMainMenuBar();
+
+	if (ImGui::BeginMenu("File")) {
+		if (ImGui::MenuItem("Open")) {
+			nfdfilteritem_t filter[1] = {{"Game Boy/Game Boy Color ROM", "gb,gbc,bin"}};
+			NFD::UniquePath nfdRomFilePath;
+			nfdresult_t nfdResult = NFD::OpenDialog(nfdRomFilePath, filter, 1);
+			if (nfdResult == NFD_OKAY) {
+				printf("Selected file: %s\n", nfdRomFilePath.get());
+				argRomGiven = true;
+				argRomFilePath = nfdRomFilePath.get();
+				loadRomFromFile();
+			} else if (nfdResult == NFD_CANCEL) {
+				printf("No file selected.\n");
+			} else {
+				printf("Error: %s\n", NFD::GetError());
+			}
+		}
+		ImGui::EndMenu();
+	}
+
+	if (ImGui::BeginMenu("Menu 1")) {
+		ImGui::MenuItem("Test 1", NULL, &var1);
+		ImGui::MenuItem("Test 2", NULL, &var2);
+		ImGui::EndMenu();
+	}
+	if (ImGui::BeginMenu("Menu 2")) {
+		ImGui::MenuItem("Test 3", NULL, &var3);
+		ImGui::EndMenu();
+	}
+
+	ImGui::EndMainMenuBar();
 }

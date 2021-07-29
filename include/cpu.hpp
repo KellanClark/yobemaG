@@ -15,6 +15,7 @@ class GameboyCPU : public SM83 {
 public:
 	GameboyCPU(Gameboy& bus_);
 
+	void reset();
 	int cycle();
 	void write(uint16_t address, uint8_t value);
 	uint8_t read(uint16_t address);
