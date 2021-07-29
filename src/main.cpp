@@ -10,7 +10,6 @@
 #include "gameboy.hpp"
 
 // Argument Variables
-NFD::Guard nfdGuard;
 bool argRomGiven;
 std::filesystem::path argRomFilePath;
 bool argBootromGiven;
@@ -207,6 +206,8 @@ int main(int argc, char *argv[]) {
 	bool showDemoWindow = true;
 	bool showAnotherWindow = false;
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+	NFD::Guard nfdGuard; // Setup Native File Dialogs
 
 	// Create image for main display
 	GLuint lcdTexture;
