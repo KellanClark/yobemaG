@@ -389,7 +389,7 @@ int main(int argc, char *argv[]) {
 		{
 			ImGui::Begin("Gameboy Screen");
 
-			ImGui::Text("Here's some sample text.");
+			ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
 			ImGui::Image((void*)(intptr_t)lcdTexture, ImVec2(160*2, 144*2));
 
 			ImGui::End();
@@ -575,16 +575,28 @@ void mainMenuBar() {
 void romInfoWindow() {
 	ImGui::Begin("ROM Info", &showRomInfo);
 
-	ImGui::Text("Rom File Name:  %s\n", argRomFilePath.c_str());
-	ImGui::Text("Bootrom File Name:  %s\n", argBootromFilePath.c_str());
+	std::string mbcString;
+	switch (emulator.rom.mbc) {
+	case NO_MBC:mbcString = "None";break;
+	case MBC_1:mbcString = "MBC1";break;
+	case MBC_2:mbcString = "MBC2";break;
+	case MBC_3:mbcString = "MBC3";break;
+	case MMM01:mbcString = "MMM01";break;
+	case MBC_5:mbcString = "MBC5";break;
+	case MBC_6:mbcString = "MBC6";break;
+	case MBC_7:mbcString = "MBC7";break;
+	}
+
+	ImGui::Text("ROM File Name:  %s\n", argRomFilePath.c_str());
+	ImGui::Text("BootROM File Name:  %s\n", argBootromFilePath.c_str());
 	ImGui::Text("File Size:  %d\n", (int)emulator.rom.romBuff.size());
-	ImGui::Text("Rom Name:  %s\n", emulator.rom.name.c_str());
+	ImGui::Text("ROM Name:  %s\n", emulator.rom.name.c_str());
 	ImGui::Text("External ROM Banks:  %d\n", emulator.rom.extROMBanks);
 	ImGui::Text("External ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
 	ImGui::Text("Game Supports DMG:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
 	ImGui::Text("Game Supports CGB:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
 	ImGui::Text("Game Supports SGB Features:  %s\n", (emulator.rom.sgbSupported ? "True" : "False"));
-	ImGui::Text("Memory Bank Controller:  %s\n", emulator.rom.mbcString);
+	ImGui::Text("Memory Bank Controller:  %s\n", mbcString.c_str());
 	ImGui::Text("Game Has Save Battery:  %s\n", (emulator.rom.saveBatteryEnabled ? "True" : "False"));
 	ImGui::Text("Game Has Real Time Clock:  %s\n", (emulator.rom.rtcEnabled ? "True" : "False"));
 	ImGui::Text("External RAM Banks:  %d\n", emulator.rom.extRAMBanks);

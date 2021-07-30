@@ -6,6 +6,7 @@ Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (
 }
 
 void Gameboy::reset() {
+	rom.reset();
 	cpu.reset();
 	ram.reset();
 

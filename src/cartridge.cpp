@@ -2,15 +2,20 @@
 #include "../include/gameboy.hpp"
 
 GameboyCartridge::GameboyCartridge(Gameboy& bus_) : bus(bus_) {
-	bootromEnabled = false;
-	selectedROMBank = 1;
-	selectedROMBankUpperBits = 0;
-
-	return;
+	reset();
 }
 
 GameboyCartridge::~GameboyCartridge() {
 	save();
+}
+
+void GameboyCartridge::reset() {
+	bootromEnabled = false;
+	selectedROMBank = 1;
+	selectedROMBankUpperBits = 0;
+	selectedExtRAMBank = 0;
+	extRAMEnabled = false;
+	advancedBankingMode = 0;
 }
 
 void GameboyCartridge::write(uint16_t address, uint8_t value) {
@@ -20,16 +25,12 @@ void GameboyCartridge::write(uint16_t address, uint8_t value) {
 		return;
 	}
 
-	// Writes to cartridge
-	if ((address <= 0x7FFF) || ((address >= 0xA000) && (address <= 0xBFFF))) {
-		switch (mbc) {
-			case MBC_1:writeMBC1(address, value);break;
-			case MBC_2:writeMBC2(address, value);break;
-			case MBC_3:writeMBC3(address, value);break;
-			case MBC_5:writeMBC5(address, value);break;
-			default:break;
-		}
-		return;
+	switch (mbc) {
+		case MBC_1:writeMBC1(address, value);break;
+		case MBC_2:writeMBC2(address, value);break;
+		case MBC_3:writeMBC3(address, value);break;
+		case MBC_5:writeMBC5(address, value);break;
+		default:break;
 	}
 
 	return;
@@ -44,29 +45,14 @@ uint8_t GameboyCartridge::read(uint16_t address) {
 	if (bootromEnabled && (address <= 0xFF))
 		return bootromBuff[address];
 
-	// Read from cartridge ROM
-	if (address <= 0x7FFF) {
-		switch (mbc) {
-			case MBC_1:return readMBC1(address);break;
-			case MBC_2:return readMBC2(address);break;
-			case MBC_3:return readMBC3(address);break;
-			case MBC_5:return readMBC5(address);break;
-			default:return romBuff[address];break;
-		}
+	switch (mbc) {
+		case MBC_1:return readMBC1(address);
+		case MBC_2:return readMBC2(address);
+		case MBC_3:return readMBC3(address);
+		case MBC_5:return readMBC5(address);
+		default:
+		case NO_MBC:return (address < 0x8000) ? romBuff[address] : 0xFF;
 	}
-
-	// Read from cartridge RAM
-	if ((address >= 0xA000) && (address <= 0xBFFF)) {
-		switch (mbc) {
-			case MBC_1:return readMBC1(address);break;
-			case MBC_2:return readMBC2(address);break;
-			case MBC_3:return readMBC3(address);break;
-			case MBC_5:return readMBC5(address);break;
-			default:return 0xFF;break;
-		}
-	}
-
-	return 0xFF; // Default return if memory doesn't exist
 }
 
 int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_, systemType requestedSystem) {
@@ -215,13 +201,6 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 			printf("Unknown MBC Value: 0x%02X\n", romBuff[0x0147]);
 			printf("No MBC is assumed\n");
 			break;
-	}
-	if (!mbc) {
-		sprintf(mbcString, "None");
-	} else if (mbc == 4) {
-		sprintf(mbcString, "MMM01");
-	} else {
-		sprintf(mbcString, "MBC%d", mbc); // TODO: Replace with switch
 	}
 
 	if (romBuff[0x0148] <= 8) {

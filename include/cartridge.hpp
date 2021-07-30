@@ -20,6 +20,7 @@ public:
 
 	GameboyCartridge(Gameboy& gb_);
 	~GameboyCartridge();
+	void reset();
 	void write(uint16_t address, uint8_t value);
 	uint8_t read(uint16_t address);
 	int load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_, systemType requestedSystem);
@@ -56,7 +57,6 @@ public:
 	// Information about the rom
 	std::string name;
 	enum gbMbcType mbc;
-	char mbcString[6];
 	bool dmgSupported;
 	bool cgbSupported;
 	bool sgbSupported;
