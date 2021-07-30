@@ -6,10 +6,11 @@ GameboyCPU::GameboyCPU(Gameboy& bus_) : SM83(bus_) {
 }
 
 void GameboyCPU::reset() {
-	memset(highRam, 0, 127); // Clear high ram
+	memset(highRam, 0, sizeof(highRam)); // Clear high ram
 
 	counter=interruptRequests=enabledInterrupts = 0; // Clear variables
-	stopped=halted = false;
+	stopped = false;
+	halted = false;
 	interruptMasterEnable = false;
 }
 

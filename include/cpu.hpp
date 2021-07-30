@@ -26,7 +26,7 @@ public:
 	bool halted;
 	int counter;
 	uint8_t opcode;
-	uint8_t highRam[128];
+	uint8_t highRam[127];
 	uint8_t interruptRequests;
 	uint8_t enabledInterrupts;
 	bool interruptMasterEnable;

@@ -2,7 +2,11 @@
 #include "gameboy.hpp"
 
 GameboyRAM::GameboyRAM(Gameboy& bus_) : bus(bus_) {
-	ram = (uint8_t *)calloc(0x2000, sizeof(uint8_t));
+	reset();
+}
+
+void GameboyRAM::reset() {
+	memset(ram, 0, sizeof(ram));
 }
 
 void GameboyRAM::write(uint16_t address, uint8_t value) {

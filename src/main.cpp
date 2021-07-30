@@ -62,6 +62,8 @@ int loadRomFromFile();
 
 // ImGui Windows
 void mainMenuBar();
+bool showRomInfo;
+void romInfoWindow();
 
 bool var1;
 bool var2;
@@ -69,10 +71,6 @@ bool var3;
 
 int main(int argc, char *argv[]) {
 	// Parse arguments
-	/*if (argc < 2) {
-		printf("Not enough arguments.\n");
-		return -1;
-	}*/
 	argRomGiven = false;
 	argBootromGiven = false;
 	argBootromFilePath = "";
@@ -128,13 +126,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	}
-	/*if (!argRomGiven) {
-		printf("No ROM given.");
-		return -1;
-	}*/
 
-	if (argBootromGiven)
-		printf("Bootrom File Name:  %s\n", argBootromFilePath.c_str());
 	if (argRomGiven) {
 		if (loadRomFromFile() == -1) {
 			return -1;
@@ -390,6 +382,9 @@ int main(int argc, char *argv[]) {
 
 		mainMenuBar();
 
+		if (showRomInfo)
+			romInfoWindow();
+
 		// Gameboy Screen
 		{
 			ImGui::Begin("Gameboy Screen");
@@ -536,21 +531,6 @@ int loadRomFromFile() {
 	if (emulator.rom.load(argRomFilePath, argBootromFilePath, argSystem))
 		return -1;
 
-	// Print info about cartridge
-	printf("Rom File Name:  %s\n", argRomFilePath.c_str());
-	printf("File Size:  %d\n", (int)emulator.rom.romBuff.size());
-	printf("Rom Name:  %s\n", emulator.rom.name.c_str());
-	printf("External ROM Banks:  %d\n", emulator.rom.extROMBanks);
-	printf("External ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
-	printf("Game Supports DMG:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
-	printf("Game Supports CGB:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
-	printf("Game Supports SGB Features:  %s\n", (emulator.rom.sgbSupported ? "True" : "False"));
-	printf("Memory Bank Controller:  %s\n", emulator.rom.mbcString);
-	printf("Game Has Save Battery:  %s\n", (emulator.rom.saveBatteryEnabled ? "True" : "False"));
-	printf("Game Has Real Time Clock:  %s\n", (emulator.rom.rtcEnabled ? "True" : "False"));
-	printf("External RAM Banks:  %d\n", emulator.rom.extRAMBanks);
-	printf("External RAM Size:  %d\n", emulator.rom.extRAMBanks * 8 * 1024);
-
 	return 0;
 }
 
@@ -558,7 +538,7 @@ void mainMenuBar() {
 	ImGui::BeginMainMenuBar();
 
 	if (ImGui::BeginMenu("File")) {
-		if (ImGui::MenuItem("Open")) {
+		if (ImGui::MenuItem("Load ROM")) {
 			nfdfilteritem_t filter[1] = {{"Game Boy/Game Boy Color ROM", "gb,gbc,bin"}};
 			NFD::UniquePath nfdRomFilePath;
 			nfdresult_t nfdResult = NFD::OpenDialog(nfdRomFilePath, filter, 1);
@@ -573,6 +553,9 @@ void mainMenuBar() {
 				printf("Error: %s\n", NFD::GetError());
 			}
 		}
+		ImGui::Separator();
+		ImGui::MenuItem("ROM Info", NULL, &showRomInfo, argRomGiven);
+
 		ImGui::EndMenu();
 	}
 
@@ -587,4 +570,25 @@ void mainMenuBar() {
 	}
 
 	ImGui::EndMainMenuBar();
+}
+
+void romInfoWindow() {
+	ImGui::Begin("ROM Info", &showRomInfo);
+
+	ImGui::Text("Rom File Name:  %s\n", argRomFilePath.c_str());
+	ImGui::Text("Bootrom File Name:  %s\n", argBootromFilePath.c_str());
+	ImGui::Text("File Size:  %d\n", (int)emulator.rom.romBuff.size());
+	ImGui::Text("Rom Name:  %s\n", emulator.rom.name.c_str());
+	ImGui::Text("External ROM Banks:  %d\n", emulator.rom.extROMBanks);
+	ImGui::Text("External ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
+	ImGui::Text("Game Supports DMG:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
+	ImGui::Text("Game Supports CGB:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
+	ImGui::Text("Game Supports SGB Features:  %s\n", (emulator.rom.sgbSupported ? "True" : "False"));
+	ImGui::Text("Memory Bank Controller:  %s\n", emulator.rom.mbcString);
+	ImGui::Text("Game Has Save Battery:  %s\n", (emulator.rom.saveBatteryEnabled ? "True" : "False"));
+	ImGui::Text("Game Has Real Time Clock:  %s\n", (emulator.rom.rtcEnabled ? "True" : "False"));
+	ImGui::Text("External RAM Banks:  %d\n", emulator.rom.extRAMBanks);
+	ImGui::Text("External RAM Size:  %d\n", emulator.rom.extRAMBanks * 8 * 1024);
+
+	ImGui::End();
 }

@@ -7,6 +7,7 @@ Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (
 
 void Gameboy::reset() {
 	cpu.reset();
+	ram.reset();
 
 	dmaCyclesLeft = 0;
 	undocumented1 = 0;

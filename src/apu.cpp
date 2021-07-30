@@ -150,10 +150,10 @@ void GameboyAPU::cycle() {
 		sampleCounter -= 4194304;
 
 		// Sample each channel
-		int16_t ch1Sample = soundControl.ch1On * (((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) - 7) / 7) * 0x7FFF;
-		int16_t ch2Sample = soundControl.ch2On * (((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) - 7) / 7) * 0x7FFF;
+		int16_t ch1Sample = soundControl.ch1On * 0;//(((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) - 7) / 7) * 0x7FFF;
+		int16_t ch2Sample = soundControl.ch2On * 0;//(((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) - 7) / 7) * 0x7FFF;
 		int16_t ch3Sample = soundControl.ch3On * 0;
-		int16_t ch4Sample = soundControl.ch4On * (((channel4.currentVolume * ((~channel4.lfsr) & 1)) - 7) / 7) * 0x7FFF;
+		int16_t ch4Sample = soundControl.ch4On * (((channel4.currentVolume * ((~channel4.lfsr) & 1)) - 8) / 8) * 0x7FFF;
 
 		// Mix and put samples into buffers
 		if (soundControl.allOn) {
