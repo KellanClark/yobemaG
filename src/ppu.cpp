@@ -171,15 +171,13 @@ void GameboyPPU::cycle() {
 							if (scanline[pixelX] == 0) {
 								objScanline[pixelX] = pixelColor;
 								objScanlineTransparent[pixelX] = false;
+								if (pixelTransparent)
+									objScanlineTransparent[pixelX] = true;
 							}
-							if (pixelTransparent)
-								objScanlineTransparent[pixelX] = true;
 						} else { // Object has priority
 							if (!pixelTransparent) {
 								objScanline[pixelX] = pixelColor;
 								objScanlineTransparent[pixelX] = false;
-							} else {
-								objScanlineTransparent[pixelX] = true;
 							}
 						}
 					}
