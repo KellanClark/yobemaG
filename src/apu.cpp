@@ -1,13 +1,6 @@
 
 #include "gameboy.hpp"
 
-/*const int16_t squareWaveDutyCycles[4][8] {
-	{-32768, -32768, -32768, -32768, -32768, -32768, -32768,  32767}, // 12.5%
-	{ 32767, -32768, -32768, -32768, -32768, -32768, -32768,  32767}, // 25%
-	{ 32767, -32768, -32768, -32768, -32768,  32767,  32767,  32767}, // 50%
-	{-32768,  32767,  32767,  32767,  32767,  32767,  32767, -32768}  // 75%
-};*/
-
 const float squareWaveDutyCycles[4][8] {
 	{0, 0, 0, 0, 0, 0, 0, 1}, // 12.5%
 	{1, 0, 0, 0, 0, 0, 0, 1}, // 25%
@@ -63,7 +56,7 @@ void GameboyAPU::cycle() {
 			if (channel4.consecutiveSelection) {
 				if (channel4.lengthCounter) {
 					if ((--channel4.lengthCounter) == 0) {
-						soundControl.ch2On = false;
+						soundControl.ch4On = false;
 					}
 				}
 			}
@@ -73,6 +66,9 @@ void GameboyAPU::cycle() {
 			if (channel1.periodTimer) {
 				if ((--channel1.periodTimer) == 0) {
 					channel1.periodTimer = channel1.envelopeSweepNum;
+					if (channel1.periodTimer == 0) {
+						channel1.periodTimer = 8;
+					}
 					if ((channel1.currentVolume < 0xF) && channel1.envelopeIncrease) {
 						++channel1.currentVolume;
 					} else if ((channel1.currentVolume > 0) && !channel1.envelopeIncrease) {
@@ -83,6 +79,9 @@ void GameboyAPU::cycle() {
 			if (channel2.periodTimer) {
 				if ((--channel2.periodTimer) == 0) {
 					channel2.periodTimer = channel2.envelopeSweepNum;
+					if (channel2.periodTimer == 0) {
+						channel2.periodTimer = 8;
+					}
 					if ((channel2.currentVolume < 0xF) && channel2.envelopeIncrease) {
 						++channel2.currentVolume;
 					} else if ((channel2.currentVolume > 0) && !channel2.envelopeIncrease) {
@@ -94,6 +93,9 @@ void GameboyAPU::cycle() {
 				//printf("0x%02X\n", channel4.currentVolume);
 				if ((--channel4.periodTimer) == 0) {
 					channel4.periodTimer = channel4.envelopeSweepNum;
+					if (channel4.periodTimer == 0) {
+						channel4.periodTimer = 8;
+					}
 					if ((channel4.currentVolume < 0xF) && channel4.envelopeIncrease) {
 						++channel4.currentVolume;
 					} else if ((channel4.currentVolume > 0) && !channel4.envelopeIncrease) {
@@ -141,7 +143,6 @@ void GameboyAPU::cycle() {
 		channel4.lfsr = ((channel4.lfsr >> 1) & 0xBFFF) | (xorBit << 14);
 		if (channel4.counterWidth)
 			channel4.lfsr = (channel4.lfsr & 0xFFBF) | (xorBit << 6);
-		//printf("%d  0x%04X\n", xorBit, channel4.lfsr);
 	}
 
 	// Sample audio
@@ -150,15 +151,15 @@ void GameboyAPU::cycle() {
 		sampleCounter -= 4194304;
 
 		// Sample each channel
-		int16_t ch1Sample = soundControl.ch1On * 0;//(((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) - 7) / 7) * 0x7FFF;
-		int16_t ch2Sample = soundControl.ch2On * 0;//(((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) - 7) / 7) * 0x7FFF;
-		int16_t ch3Sample = soundControl.ch3On * 0;
-		int16_t ch4Sample = soundControl.ch4On * (((channel4.currentVolume * ((~channel4.lfsr) & 1)) - 8) / 8) * 0x7FFF;
+		float ch1Sample = soundControl.ch1On * ((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) / 7.5) - 1.0f;
+		float ch2Sample = soundControl.ch2On * ((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) / 7.5) - 1.0f;
+		float ch3Sample = soundControl.ch3On * 0;
+		float ch4Sample = soundControl.ch4On * ((channel4.currentVolume * ((~channel4.lfsr) & 1)) / 7.5) - 1.0f;
 
 		// Mix and put samples into buffers
 		if (soundControl.allOn) {
-			sampleBuffer[sampleBufferIndex++] = (((ch1Sample * soundControl.ch1out1) + (ch2Sample * soundControl.ch2out1) + (ch3Sample * soundControl.ch3out1) + (ch4Sample * soundControl.ch4out1)) / 4) * soundControl.volumeFloat1;
-			sampleBuffer[sampleBufferIndex++] = (((ch1Sample * soundControl.ch1out2) + (ch2Sample * soundControl.ch2out2) + (ch3Sample * soundControl.ch3out2) + (ch4Sample * soundControl.ch4out2)) / 4) * soundControl.volumeFloat2;
+			sampleBuffer[sampleBufferIndex++] = (((ch1Sample * soundControl.ch1out1) + (ch2Sample * soundControl.ch2out1) + (ch3Sample * soundControl.ch3out1) + (ch4Sample * soundControl.ch4out1)) / 4) * soundControl.volumeFloat1 * 0x7FFF;
+			sampleBuffer[sampleBufferIndex++] = (((ch1Sample * soundControl.ch1out2) + (ch2Sample * soundControl.ch2out2) + (ch3Sample * soundControl.ch3out2) + (ch4Sample * soundControl.ch4out2)) / 4) * soundControl.volumeFloat2 * 0x7FFF;
 		} else {
 			sampleBuffer[sampleBufferIndex++] = 0;
 			sampleBuffer[sampleBufferIndex++] = 0;

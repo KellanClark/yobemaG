@@ -10,7 +10,6 @@ public:
 
 	SM83(Gameboy& bus_);
 	void executeOpcode();
-	void executeOpcodeCA();
 
 	int mCycle;
 
@@ -68,9 +67,9 @@ private:
 	uint16_t *decodeReg16(uint8_t operand);
 	bool checkBranchCondition(uint8_t opcode);
 	// Memory
-	uint8_t fetchByte(uint16_t address);
-	uint16_t fetchWord(uint16_t address);
-	void writeByte(uint16_t address, uint8_t value);
+	inline uint8_t fetchByte(uint16_t address);
+	inline uint16_t fetchWord(uint16_t address);
+	inline void writeByte(uint16_t address, uint8_t value);
 	// ALU
 	void RLC(uint8_t *operand);
 	void RRC(uint8_t *operand);

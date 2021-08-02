@@ -482,7 +482,7 @@ uint16_t SM83::fetchWord(uint16_t address) {
 	return bus.read16(address);
 }
 
-inline void SM83::writeByte(uint16_t address, uint8_t value) {
+void SM83::writeByte(uint16_t address, uint8_t value) {
 	bus.cycleSystem();
 	bus.write8(address, value);
 

@@ -15,7 +15,9 @@ std::filesystem::path argRomFilePath;
 bool argBootromGiven;
 std::filesystem::path argBootromFilePath;
 systemType argSystem;
+gbMbcType argMbc;
 bool argLogConsole;
+bool unlockFramerate = false;
 
 // I have no idea how this works. I found this piece of magic on the internet somewhere.
 constexpr auto cexprHash(const char *str, std::size_t v = 0) noexcept -> std::size_t {
@@ -64,10 +66,9 @@ int loadRomFromFile();
 void mainMenuBar();
 bool showRomInfo;
 void romInfoWindow();
-
-bool var1;
-bool var2;
-bool var3;
+bool waitingForBootrom;
+bool showNoBootrom;
+void noBootromWindow();
 
 int main(int argc, char *argv[]) {
 	// Parse arguments
@@ -75,7 +76,9 @@ int main(int argc, char *argv[]) {
 	argBootromGiven = false;
 	argBootromFilePath = "";
 	argSystem = SYSTEM_DEFAULT;
+	argMbc = DEFAULT_MBC;
 	argLogConsole = false;
+	unlockFramerate = false;
 	for (int i = 1; i < argc; i++) {
 		switch (cexprHash(argv[i])) {
 		case cexprHash("--rom"):
@@ -113,8 +116,49 @@ int main(int argc, char *argv[]) {
 				return -1;
 			}
 			break;
+		case cexprHash("--mbc"):
+			if (argc == ++i) {
+				printf("Not enough arguments for flag --mbc\n");
+				return -1;
+			}
+			switch (cexprHash(argv[i])) {
+			case cexprHash("none"):
+				argMbc = NO_MBC;
+				break;
+			case cexprHash("MBC1"):
+				argMbc = MBC_1;
+				break;
+			case cexprHash("MBC2"):
+				argMbc = MBC_2;
+				break;
+			case cexprHash("MBC3"):
+				argMbc = MBC_3;
+				break;
+			case cexprHash("MMM01"):
+				argMbc = MMM01;
+				break;
+			case cexprHash("MBC5"):
+				argMbc = MBC_5;
+				break;
+			case cexprHash("MBC6"):
+				argMbc = MBC_6;
+				break;
+			case cexprHash("MBC7"):
+				argMbc = MBC_7;
+				break;
+			case cexprHash("wisdomtree"):
+				argMbc = WISDOM_TREE;
+				break;
+			default:
+				printf("Unknown argument for flag --mbc:  %s", argv[i]);
+				return -1;
+			}
+			break;
 		case cexprHash("--log-to-console"):
 			argLogConsole = true;
+			break;
+		case cexprHash("--unlock-framerate"):
+			unlockFramerate = true;
 			break;
 		default:
 			if (i == 1) {
@@ -210,11 +254,11 @@ int main(int argc, char *argv[]) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	/*uint8_t colors[4][4] = {
-		{155, 188,  15, 255},
-		{139, 172,  15, 255},
-		{ 48,  98,  48, 255},
-		{ 15,  56,  15, 255}};*/
+	/*uint32_t colors[4] = {
+		(uint32_t)((155 << 24) | (188 << 16) | ( 15 << 8) | 255),
+		(uint32_t)((139 << 24) | (172 << 16) | ( 15 << 8) | 255),
+		(uint32_t)(( 48 << 24) | ( 98 << 16) | ( 48 << 8) | 255),
+		(uint32_t)(( 15 << 24) | ( 56 << 16) | ( 15 << 8) | 255)};*/
 	uint32_t colors[4] = {
 		(uint32_t)((255 << 24) | (255 << 16) | (255 << 8) | 255),
 		(uint32_t)((170 << 24) | (170 << 16) | (170 << 8) | 255),
@@ -226,7 +270,6 @@ int main(int argc, char *argv[]) {
 
 	// Main loop
 	bool debug = false;
-	bool unlockFramerate = false;
 	SDL_Event event;
 	bool done = false;
 	while (!done) {
@@ -247,12 +290,6 @@ int main(int argc, char *argv[]) {
 				directionButtonPressed = false;
 				actionButtonPressed = false;
 				switch (event.key.keysym.sym) {
-				case SDLK_d:
-					//debug = true;
-					break;
-				case SDLK_u:
-					unlockFramerate = unlockFramerate ? false : true;
-					break;
 				case SDLK_s:
 					emulator.rom.save();
 					break;
@@ -324,45 +361,47 @@ int main(int argc, char *argv[]) {
 		}
 
 		emulator.ppu.frameDone = false;
-		while (!emulator.ppu.frameDone && argRomGiven) {
-			//if (emulator.cpu.r.pc == 0x0098) debug = true;
-			//	printf("0x%04X\n", emulator.cpu.r.pc);
-			if (argLogConsole)
-				printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n", emulator.cpu.r.a, emulator.cpu.r.f, emulator.cpu.r.b, emulator.cpu.r.c, emulator.cpu.r.d, emulator.cpu.r.e, emulator.cpu.r.h, emulator.cpu.r.l, emulator.cpu.r.sp, emulator.cpu.r.pc, emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
-			if (debug) {
-				printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-				printf("AF:  0x%02X %02X\n", emulator.cpu.r.a, emulator.cpu.r.f);
-				printf("BC:  0x%02X %02X\n", emulator.cpu.r.b, emulator.cpu.r.c);
-				printf("DE:  0x%02X %02X\n", emulator.cpu.r.d, emulator.cpu.r.e);
-				printf("HL:  0x%02X %02X\n", emulator.cpu.r.h, emulator.cpu.r.l);
-				printf("\n");
-				printf("Flags\n");
-				printf("Zero:  %d\n", (emulator.cpu.r.f&0x80)>>7);
-				printf("Subtract:  %d\n", (emulator.cpu.r.f&0x40)>>6);
-				printf("Half Carry:  %d\n", (emulator.cpu.r.f&0x20)>>5);
-				printf("Carry:  %d\n", (emulator.cpu.r.f&0x10)>>4);
-				printf("\n");
-				printf("PC:  0x%X\n", emulator.cpu.r.pc);
-				printf("SP:  0x%X\n", emulator.cpu.r.sp);
-				printf("IME:  %d\n", emulator.cpu.interruptMasterEnable);
-				printf("IF:  %d\n", emulator.cpu.interruptRequests);
-				printf("IE:  %d\n", emulator.cpu.enabledInterrupts);
-				printf("\n");
-				printf("Data at PC:  0x%02X, 0x%02X, 0x%02X, 0x%02X\n", emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc+1), emulator.read8(emulator.cpu.r.pc+2), emulator.read8(emulator.cpu.r.pc+3));
-				printf("Data at SP:  0x%02X, 0x%02X, 0x%02X, 0x%02X\n", emulator.read8(emulator.cpu.r.sp), emulator.read8(emulator.cpu.r.sp+1), emulator.read8(emulator.cpu.r.sp+2), emulator.read8(emulator.cpu.r.sp+3));
-				printf("\n");
-				printf("PPU Mode:  %d\n", emulator.ppu.mode);
-				printf("PPU Mode Cycle:  %d\n", emulator.ppu.modeCycle);
-				printf("Current Scanline:  %d\n", emulator.ppu.line);
-				getchar();
+		if (argRomGiven && !waitingForBootrom) {
+			while (!emulator.ppu.frameDone) {
+				//if (emulator.cpu.r.pc == 0x0098) debug = true;
+				//	printf("0x%04X\n", emulator.cpu.r.pc);
+				if (argLogConsole)
+					printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n", emulator.cpu.r.a, emulator.cpu.r.f, emulator.cpu.r.b, emulator.cpu.r.c, emulator.cpu.r.d, emulator.cpu.r.e, emulator.cpu.r.h, emulator.cpu.r.l, emulator.cpu.r.sp, emulator.cpu.r.pc, emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
+				if (debug) {
+					printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+					printf("AF:  0x%02X %02X\n", emulator.cpu.r.a, emulator.cpu.r.f);
+					printf("BC:  0x%02X %02X\n", emulator.cpu.r.b, emulator.cpu.r.c);
+					printf("DE:  0x%02X %02X\n", emulator.cpu.r.d, emulator.cpu.r.e);
+					printf("HL:  0x%02X %02X\n", emulator.cpu.r.h, emulator.cpu.r.l);
+					printf("\n");
+					printf("Flags\n");
+					printf("Zero:  %d\n", (emulator.cpu.r.f&0x80)>>7);
+					printf("Subtract:  %d\n", (emulator.cpu.r.f&0x40)>>6);
+					printf("Half Carry:  %d\n", (emulator.cpu.r.f&0x20)>>5);
+					printf("Carry:  %d\n", (emulator.cpu.r.f&0x10)>>4);
+					printf("\n");
+					printf("PC:  0x%X\n", emulator.cpu.r.pc);
+					printf("SP:  0x%X\n", emulator.cpu.r.sp);
+					printf("IME:  %d\n", emulator.cpu.interruptMasterEnable);
+					printf("IF:  %d\n", emulator.cpu.interruptRequests);
+					printf("IE:  %d\n", emulator.cpu.enabledInterrupts);
+					printf("\n");
+					printf("Data at PC:  0x%02X, 0x%02X, 0x%02X, 0x%02X\n", emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc+1), emulator.read8(emulator.cpu.r.pc+2), emulator.read8(emulator.cpu.r.pc+3));
+					printf("Data at SP:  0x%02X, 0x%02X, 0x%02X, 0x%02X\n", emulator.read8(emulator.cpu.r.sp), emulator.read8(emulator.cpu.r.sp+1), emulator.read8(emulator.cpu.r.sp+2), emulator.read8(emulator.cpu.r.sp+3));
+					printf("\n");
+					printf("PPU Mode:  %d\n", emulator.ppu.mode);
+					printf("PPU Mode Cycle:  %d\n", emulator.ppu.modeCycle);
+					printf("Current Scanline:  %d\n", emulator.ppu.line);
+					getchar();
+				}
+				emulator.cpu.cycle();
 			}
-			emulator.cpu.cycle();
-		}
 
-		// Temporary audio bandaid
-		if (emulator.ppu.lcdc.lcdEnable && emulator.apu.sampleBufferIndex) {
-			sampleBufferCallback();
-			emulator.apu.sampleBufferIndex = 0;
+			// Temporary audio bandaid
+			if (emulator.ppu.lcdc.lcdEnable && emulator.apu.sampleBufferIndex) {
+				sampleBufferCallback();
+				emulator.apu.sampleBufferIndex = 0;
+			}
 		}
 
 		// Convert framebuffer to screen colors
@@ -384,6 +423,8 @@ int main(int argc, char *argv[]) {
 
 		if (showRomInfo)
 			romInfoWindow();
+		if (showNoBootrom)
+			noBootromWindow();
 
 		// Gameboy Screen
 		{
@@ -434,7 +475,7 @@ int main(int argc, char *argv[]) {
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		SDL_GL_SwapWindow(window);
 
-		if (!unlockFramerate && 0) {
+		if (!unlockFramerate) {
 			while ((SDL_GetTicks() - frameStartTicks) <= ((1000 / 60) - 2));
 				//sleep(1);
 		}
@@ -528,7 +569,7 @@ void sampleBufferCallback() {
 int loadRomFromFile() {
 	emulator.reset();
 
-	if (emulator.rom.load(argRomFilePath, argBootromFilePath, argSystem))
+	if (emulator.rom.load(argRomFilePath, argBootromFilePath, argSystem, argMbc))
 		return -1;
 
 	return 0;
@@ -543,29 +584,84 @@ void mainMenuBar() {
 			NFD::UniquePath nfdRomFilePath;
 			nfdresult_t nfdResult = NFD::OpenDialog(nfdRomFilePath, filter, 1);
 			if (nfdResult == NFD_OKAY) {
-				printf("Selected file: %s\n", nfdRomFilePath.get());
 				argRomGiven = true;
 				argRomFilePath = nfdRomFilePath.get();
-				loadRomFromFile();
-			} else if (nfdResult == NFD_CANCEL) {
-				printf("No file selected.\n");
-			} else {
+				if (!argBootromGiven) {
+					waitingForBootrom = true;
+					showNoBootrom = true;
+				} else {
+					loadRomFromFile();
+				}
+			} else if (nfdResult != NFD_CANCEL) {
 				printf("Error: %s\n", NFD::GetError());
 			}
 		}
+
+		if (ImGui::MenuItem("Load BootROM")) {
+			nfdfilteritem_t filter[1] = {{"Game Boy/Game Boy Color BootROM", "bin"}};
+			NFD::UniquePath nfdBootromFilePath;
+			nfdresult_t nfdResult = NFD::OpenDialog(nfdBootromFilePath, filter, 1);
+			if (nfdResult == NFD_OKAY) {
+				argBootromGiven = true;
+				argBootromFilePath = nfdBootromFilePath.get();
+				waitingForBootrom = false;
+				showNoBootrom = false;
+				if (argRomGiven)
+					loadRomFromFile();
+			} else if (nfdResult != NFD_CANCEL) {
+				printf("Error: %s\n", NFD::GetError());
+			}
+		}
+
+		if (ImGui::MenuItem("Save", NULL, false, emulator.rom.saveBatteryEnabled)) {
+			emulator.rom.save();
+		}
+
 		ImGui::Separator();
 		ImGui::MenuItem("ROM Info", NULL, &showRomInfo, argRomGiven);
 
 		ImGui::EndMenu();
 	}
 
-	if (ImGui::BeginMenu("Menu 1")) {
-		ImGui::MenuItem("Test 1", NULL, &var1);
-		ImGui::MenuItem("Test 2", NULL, &var2);
-		ImGui::EndMenu();
-	}
-	if (ImGui::BeginMenu("Menu 2")) {
-		ImGui::MenuItem("Test 3", NULL, &var3);
+	if (ImGui::BeginMenu("Emulation")) {
+		ImGui::MenuItem("Unlock Framerate", NULL, &unlockFramerate);
+
+		if (ImGui::BeginMenu("System")) {
+			if (ImGui::Selectable("Default", argSystem == SYSTEM_DEFAULT) && argSystem != SYSTEM_DEFAULT) {
+				argSystem = SYSTEM_DEFAULT;
+				loadRomFromFile();
+			}
+			ImGui::Separator();
+			if (ImGui::Selectable("Game Boy (DMG)", argSystem == SYSTEM_DMG) && argSystem != SYSTEM_DMG) {
+				argSystem = SYSTEM_DMG;
+				loadRomFromFile();
+			}
+			if (ImGui::Selectable("Game Boy Color (CGB)", argSystem == SYSTEM_CGB) && argSystem != SYSTEM_CGB) {
+				argSystem = SYSTEM_CGB;
+				loadRomFromFile();
+			}
+
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu("Memory Bank Controller")) {
+			if (ImGui::Selectable("Default", argMbc == DEFAULT_MBC) && argMbc != DEFAULT_MBC) {argMbc = DEFAULT_MBC; loadRomFromFile();}
+			ImGui::Separator();
+			if (ImGui::Selectable("None", emulator.rom.mbc == NO_MBC)) argMbc = NO_MBC;
+			if (ImGui::Selectable("MBC1", emulator.rom.mbc == MBC_1)) argMbc = MBC_1;
+			if (ImGui::Selectable("MBC2", emulator.rom.mbc == MBC_2)) argMbc = MBC_2;
+			if (ImGui::Selectable("MBC3", emulator.rom.mbc == MBC_3)) argMbc = MBC_3;
+			if (ImGui::Selectable("MMM01", emulator.rom.mbc == MMM01)) argMbc = MMM01;
+			if (ImGui::Selectable("MBC5", emulator.rom.mbc == MBC_5)) argMbc = MBC_5;
+			if (ImGui::Selectable("MBC6", emulator.rom.mbc == MBC_6)) argMbc = MBC_6;
+			if (ImGui::Selectable("MBC7", emulator.rom.mbc == MBC_7)) argMbc = MBC_7;
+			if (ImGui::Selectable("Wisdom Tree", emulator.rom.mbc == WISDOM_TREE)) argMbc = WISDOM_TREE;
+			if ((emulator.rom.mbc != argMbc) && (argMbc != DEFAULT_MBC))
+				loadRomFromFile();
+
+			ImGui::EndMenu();
+		}
+
 		ImGui::EndMenu();
 	}
 
@@ -585,14 +681,16 @@ void romInfoWindow() {
 	case MBC_5:mbcString = "MBC5";break;
 	case MBC_6:mbcString = "MBC6";break;
 	case MBC_7:mbcString = "MBC7";break;
+	case WISDOM_TREE:mbcString = "Wisdom Tree";break;
+	default:mbcString = "Unknown";break;
 	}
 
-	ImGui::Text("ROM File Name:  %s\n", argRomFilePath.c_str());
-	ImGui::Text("BootROM File Name:  %s\n", argBootromFilePath.c_str());
-	ImGui::Text("File Size:  %d\n", (int)emulator.rom.romBuff.size());
+	ImGui::Text("ROM File:  %s\n", argRomFilePath.c_str());
+	ImGui::Text("BootROM File:  %s\n", argBootromFilePath.c_str());
+	ImGui::Text("ROM File Size:  %d\n", (int)emulator.rom.romBuff.size());
 	ImGui::Text("ROM Name:  %s\n", emulator.rom.name.c_str());
-	ImGui::Text("External ROM Banks:  %d\n", emulator.rom.extROMBanks);
-	ImGui::Text("External ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
+	ImGui::Text("ROM Banks:  %d\n", emulator.rom.extROMBanks);
+	ImGui::Text("ROM Size:  %d\n", emulator.rom.extROMBanks * 16 * 1024);
 	ImGui::Text("Game Supports DMG:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
 	ImGui::Text("Game Supports CGB:  %s\n", (emulator.rom.dmgSupported ? "True" : "False"));
 	ImGui::Text("Game Supports SGB Features:  %s\n", (emulator.rom.sgbSupported ? "True" : "False"));
@@ -601,6 +699,43 @@ void romInfoWindow() {
 	ImGui::Text("Game Has Real Time Clock:  %s\n", (emulator.rom.rtcEnabled ? "True" : "False"));
 	ImGui::Text("External RAM Banks:  %d\n", emulator.rom.extRAMBanks);
 	ImGui::Text("External RAM Size:  %d\n", emulator.rom.extRAMBanks * 8 * 1024);
+
+	ImGui::End();
+}
+
+void noBootromWindow() {
+	// Center window
+	ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5, 0.5));
+	ImGui::Begin("No BootROM Selected");
+
+	ImGui::Text("You have chosen a ROM, but no BootROM.\nWould you like to start now or wait until a BootROM is selected?");
+
+	if (ImGui::Button("Wait"))
+		showNoBootrom = false;
+	ImGui::SameLine();
+	if (ImGui::Button("Continue")) {
+		waitingForBootrom = false;
+		showNoBootrom = false;
+		loadRomFromFile();
+	}
+
+	ImGui::End();
+}
+
+void mbcChangeWarningWindow() {
+	// Center window
+	ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5, 0.5));
+	ImGui::Begin("MBC Override");
+
+	ImGui::Text("Warning! Changing the MBC to one not specified by the cartridge may have unexpected results.");
+
+	if (ImGui::Button("Cancel")) {
+		//
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Continue")) {
+		//
+	}
 
 	ImGui::End();
 }

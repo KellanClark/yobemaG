@@ -10,6 +10,13 @@ GameboyCartridge::~GameboyCartridge() {
 }
 
 void GameboyCartridge::reset() {
+	/*if (bootromFilePath == "") {
+		bootromEnabled = false;
+		bus.cpu.r.pc = 0x0100;
+	} else {
+		bootromEnabled = true;
+		bus.cpu.r.pc = 0x0000;
+	}*/
 	bootromEnabled = false;
 	selectedROMBank = 1;
 	selectedROMBankUpperBits = 0;
@@ -30,6 +37,7 @@ void GameboyCartridge::write(uint16_t address, uint8_t value) {
 		case MBC_2:writeMBC2(address, value);break;
 		case MBC_3:writeMBC3(address, value);break;
 		case MBC_5:writeMBC5(address, value);break;
+		case WISDOM_TREE:writeWisdomTree(address, value);break;
 		default:break;
 	}
 
@@ -50,12 +58,13 @@ uint8_t GameboyCartridge::read(uint16_t address) {
 		case MBC_2:return readMBC2(address);
 		case MBC_3:return readMBC3(address);
 		case MBC_5:return readMBC5(address);
+		case WISDOM_TREE:return readWisdomTree(address);
 		default:
 		case NO_MBC:return (address < 0x8000) ? romBuff[address] : 0xFF;
 	}
 }
 
-int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_, systemType requestedSystem) {
+int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_, systemType requestedSystem, gbMbcType requestedMbc) {
 	// Read rom data into memory
 	romFilePath = romFilePath_;
 	std::ifstream romFileStream;
@@ -81,6 +90,14 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 		bus.cpu.r.de = 0x00D8;
 		bus.cpu.r.hl = 0x014D;
 		bus.cpu.r.sp = 0xFFFE;
+		bus.cpu.interruptRequests = 0xE1;
+		bus.ppu.lcdc.value = 0x91;
+		bus.ppu.scrollY = 0x00;
+		bus.ppu.scrollX = 0x00;
+		bus.ppu.lineCompare = 0x00;
+		bus.ppu.windowY = 0x00;
+		bus.ppu.windowX = 0x00;
+		bus.cpu.enabledInterrupts = 0x00;
 	} else { // Read bootrom data into memory
 		bootromEnabled = true;
 		bus.cpu.r.pc = 0x0000;
@@ -202,6 +219,13 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 			printf("No MBC is assumed\n");
 			break;
 	}
+	if ((romBuff[0x0147] == 0xC0) && (romBuff[0x014A] == 0xD1))
+		mbc = WISDOM_TREE;
+	if (requestedMbc != DEFAULT_MBC)
+		mbc = requestedMbc;
+	
+	if (mbc == WISDOM_TREE)
+		selectedROMBank = 0;
 
 	if (romBuff[0x0148] <= 8) {
 		extROMBanks = 2 << romBuff[0x0148];
@@ -375,11 +399,11 @@ void GameboyCartridge::writeMBC5(uint16_t address, uint8_t value) {
 		return;
 	case 0x2000 ... 0x2FFF: // Select ROM bank lower bits
 		selectedROMBank = (selectedROMBank & 0x100) | value;
-		selectedROMBank = (selectedROMBank % extROMBanks);
+		selectedROMBank = selectedROMBank % extROMBanks;
 		return;
 	case 0x3000 ... 0x3FFF: // Select ROM bank upper bit
 		selectedROMBank = (selectedROMBank & 0xFF) | (value << 8);
-		selectedROMBank = (selectedROMBank % extROMBanks);
+		selectedROMBank = selectedROMBank % extROMBanks;
 		return;
 	case 0x4000 ... 0x5FFF: // Select RAM bank
 		selectedExtRAMBank = (value & 0xF) % extRAMBanks;
@@ -403,6 +427,20 @@ uint8_t GameboyCartridge::readMBC5(uint16_t address) {
 	}
 
 	return 0xFF;
+}
+
+void GameboyCartridge::writeWisdomTree(uint16_t address, uint8_t value) {
+	if (address <= 0x7FFF) {
+		selectedROMBank = (address & 0xFF) % extROMBanks;
+	}
+}
+
+uint8_t GameboyCartridge::readWisdomTree(uint16_t address) {
+	if (address <= 0x7FFF) {
+		return romBuff[address + (selectedROMBank << 15)];
+	} else {
+		return 0xFF;
+	}
 }
 
 void GameboyCartridge::save() {

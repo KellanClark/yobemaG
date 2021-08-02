@@ -9,7 +9,9 @@ enum gbMbcType {
 	MMM01,
 	MBC_5,
 	MBC_6,
-	MBC_7
+	MBC_7,
+	WISDOM_TREE,
+	DEFAULT_MBC
 };
 
 enum systemType : int;
@@ -23,18 +25,20 @@ public:
 	void reset();
 	void write(uint16_t address, uint8_t value);
 	uint8_t read(uint16_t address);
-	int load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_, systemType requestedSystem);
+	int load(std::filesystem::path romFilePath_, std::filesystem::path bootromFilePath_, systemType requestedSystem, gbMbcType requestedMbc = DEFAULT_MBC);
 	void save();
 
 	// MBC reads and writes
-	void writeMBC1(uint16_t address, uint8_t value);
-	uint8_t readMBC1(uint16_t address);
-	void writeMBC2(uint16_t address, uint8_t value);
-	uint8_t readMBC2(uint16_t address);
-	void writeMBC3(uint16_t address, uint8_t value);
-	uint8_t readMBC3(uint16_t address);
-	void writeMBC5(uint16_t address, uint8_t value);
-	uint8_t readMBC5(uint16_t address);
+	inline void writeMBC1(uint16_t address, uint8_t value);
+	inline uint8_t readMBC1(uint16_t address);
+	inline void writeMBC2(uint16_t address, uint8_t value);
+	inline uint8_t readMBC2(uint16_t address);
+	inline void writeMBC3(uint16_t address, uint8_t value);
+	inline uint8_t readMBC3(uint16_t address);
+	inline void writeMBC5(uint16_t address, uint8_t value);
+	inline uint8_t readMBC5(uint16_t address);
+	inline void writeWisdomTree(uint16_t address, uint8_t value);
+	inline uint8_t readWisdomTree(uint16_t address);
 
 	// File names and data
 	std::filesystem::path romFilePath;

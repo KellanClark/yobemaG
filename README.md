@@ -10,7 +10,7 @@ Game Boy spelled backwards because that makes about as much sense as my code. A 
 
 ## Requirements
 * Any modern 64 bit linux distribution (may work on 32 bit but not tested)
-* `cmake`, `make`, SDL2, and g++ that supports C++20
+* `cmake`, `make`, SDL2 development libraries, Gtk3 development libraries (for `nativefiledialog-extended`), and g++ that supports C++20
 
 ## Usage Instructions
 To compile:
@@ -23,7 +23,9 @@ Run the executable named `yobemag`. If the first argument is not valid, it is tr
 Arguments:
 * `--rom <file>`
 * `--bootrom <file>` Give path to the bootrom. CPU registers will be set to correct values if not given.
-* `--system <dmg/gb, cgb/gbc>` Specify which system to use. This may affect specific features and starting register values. Defaults to cgb if supported by ROM and not specified.
+* `--system <dmg/gb, cgb/gbc>` Specify which system to use. This may affect specific features and starting register values. Defaults to Game Boy Color if supported by ROM.
+* `--mbc <none, MBC1, MBC2, MBC3, MMM01, MBC5, MBC6, MBC7, wisdomtree>` Override the ROM's MBC. This may have upredictable consequences and shouldn't be used in most circumstances.
 * `--log-to-console` Log values of each CPU register to console after every instruction. WARNING: May drastically slow down emulator. It is recommended to pipe the output into a file.
+* `--unlock-framerate` Run emulator as fast as possible. Using this will cause major audio desync.
 
 Example: `yobemag Tetris.gb --bootrom bootrom.bin`
