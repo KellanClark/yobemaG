@@ -13,12 +13,13 @@ class GameboyPPU {
 public:
 	Gameboy& bus;
 
-	GameboyPPU(Gameboy& bus_);
+	GameboyPPU(Gameboy& bus_, void (*drawFrame_)());
 	void cycle();
 	void write(uint16_t address, uint8_t value);
 	uint8_t read(uint16_t address);
 	void setMode(enum ppuModes newMode);
 	void checkLCDStatusForInterrupt();
+	void (*drawFrame)();
 
 	uint8_t outputFramebuffer[160*144];
 	uint8_t vram[0x2000];
@@ -43,7 +44,6 @@ public:
 		uint8_t oam[160];
 	};
 
-	bool frameDone;
 	int column;
 	int modeCycle;
 	int lineCycle;

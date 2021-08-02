@@ -42,6 +42,7 @@ public:
 
 	Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(),
 			void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t),
+			void (*ppuVblank)(),
 			void (*apuSampleBufferFull)());
 	void reset();
 	void cycleSystem();

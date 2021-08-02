@@ -50,17 +50,28 @@ void serialWriteCallback(uint16_t address, uint8_t value);
 uint8_t serialReadCallback(uint16_t address);
 
 // Audio stuff
+bool syncToAudio;
 SDL_AudioSpec desiredAudioSpec, audioSpec;
 SDL_AudioDeviceID audioDevice;
 std::vector<int16_t> wavFileData;
 std::ofstream wavFileStream;
+void audioCallback(void *userdata, uint8_t *stream, int len);
 void sampleBufferCallback();
 
-Gameboy emulator(&joypadWriteCallback, &joypadReadCallback,
-				&serialWriteCallback, &serialReadCallback,
-				&sampleBufferCallback);
-
-int loadRomFromFile();
+// Graphics
+SDL_Window* window;
+/*uint32_t colors[4] = {
+	(uint32_t)((155 << 24) | (188 << 16) | ( 15 << 8) | 255),
+	(uint32_t)((139 << 24) | (172 << 16) | ( 15 << 8) | 255),
+	(uint32_t)(( 48 << 24) | ( 98 << 16) | ( 48 << 8) | 255),
+	(uint32_t)(( 15 << 24) | ( 56 << 16) | ( 15 << 8) | 255)};*/
+uint32_t colors[4] = {
+	(uint32_t)((255 << 24) | (255 << 16) | (255 << 8) | 255),
+	(uint32_t)((170 << 24) | (170 << 16) | (170 << 8) | 255),
+	(uint32_t)(( 85 << 24) | ( 85 << 16) | ( 85 << 8) | 255),
+	(uint32_t)((  0 << 24) | (  0 << 16) | (  0 << 8) | 255)};
+uint32_t pixels[160 * 144];
+GLuint lcdTexture;
 
 // ImGui Windows
 void mainMenuBar();
@@ -70,6 +81,16 @@ bool waitingForBootrom;
 bool showNoBootrom;
 void noBootromWindow();
 
+// Everything else
+bool frameDone;
+int loadRomFromFile();
+void vblankCallback();
+
+Gameboy emulator(&joypadWriteCallback, &joypadReadCallback,
+				&serialWriteCallback, &serialReadCallback,
+				&vblankCallback,
+				&sampleBufferCallback);
+
 int main(int argc, char *argv[]) {
 	// Parse arguments
 	argRomGiven = false;
@@ -78,6 +99,7 @@ int main(int argc, char *argv[]) {
 	argSystem = SYSTEM_DEFAULT;
 	argMbc = DEFAULT_MBC;
 	argLogConsole = false;
+	syncToAudio = true;
 	unlockFramerate = false;
 	for (int i = 1; i < argc; i++) {
 		switch (cexprHash(argv[i])) {
@@ -207,7 +229,7 @@ int main(int argc, char *argv[]) {
 	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
 	std::string windowName = "yoBemaG - ";
 	windowName += argRomFilePath;
-	SDL_Window* window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+	window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
 	SDL_GLContext gl_context = SDL_GL_CreateContext(window);
 	SDL_GL_MakeCurrent(window, gl_context);
 	SDL_GL_SetSwapInterval(1); // Enable vsync
@@ -222,16 +244,22 @@ int main(int argc, char *argv[]) {
 		.format = AUDIO_S16,
 		.channels = 2,
 		.samples = 1024,
-		.callback = NULL
+		.callback = NULL,
+		.userdata = NULL
 	};
+	if (syncToAudio) {
+		desiredAudioSpec.samples  = 512;
+		desiredAudioSpec.callback = audioCallback;
+	}
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredAudioSpec, &audioSpec, 0);
 	SDL_PauseAudioDevice(audioDevice, 0);
 	emulator.apu.sampleRate = audioSpec.freq;
+	printf("%d\n", audioSpec.silence);
 
 	// Setup ImGui
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGuiIO& io = ImGui::GetIO();
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;	 // Enable Keyboard Controls
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;	  // Enable Gamepad Controls
 	ImGui::StyleColorsDark();
@@ -246,7 +274,6 @@ int main(int argc, char *argv[]) {
 	NFD::Guard nfdGuard; // Setup Native File Dialogs
 
 	// Create image for main display
-	GLuint lcdTexture;
 	glGenTextures(1, &lcdTexture);
 	glBindTexture(GL_TEXTURE_2D, lcdTexture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -254,17 +281,6 @@ int main(int argc, char *argv[]) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	/*uint32_t colors[4] = {
-		(uint32_t)((155 << 24) | (188 << 16) | ( 15 << 8) | 255),
-		(uint32_t)((139 << 24) | (172 << 16) | ( 15 << 8) | 255),
-		(uint32_t)(( 48 << 24) | ( 98 << 16) | ( 48 << 8) | 255),
-		(uint32_t)(( 15 << 24) | ( 56 << 16) | ( 15 << 8) | 255)};*/
-	uint32_t colors[4] = {
-		(uint32_t)((255 << 24) | (255 << 16) | (255 << 8) | 255),
-		(uint32_t)((170 << 24) | (170 << 16) | (170 << 8) | 255),
-		(uint32_t)(( 85 << 24) | ( 85 << 16) | ( 85 << 8) | 255),
-		(uint32_t)((  0 << 24) | (  0 << 16) | (  0 << 8) | 255)};
-	uint32_t pixels[160 * 144];
 	memset(pixels, 0, sizeof(pixels));
 	memset(emulator.ppu.outputFramebuffer, 0, sizeof(emulator.ppu.outputFramebuffer));
 
@@ -360,11 +376,9 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		emulator.ppu.frameDone = false;
-		if (argRomGiven && !waitingForBootrom) {
-			while (!emulator.ppu.frameDone) {
-				//if (emulator.cpu.r.pc == 0x0098) debug = true;
-				//	printf("0x%04X\n", emulator.cpu.r.pc);
+		frameDone = false;
+		if (argRomGiven && !waitingForBootrom && !syncToAudio) {
+			while (!frameDone) {
 				if (argLogConsole)
 					printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n", emulator.cpu.r.a, emulator.cpu.r.f, emulator.cpu.r.b, emulator.cpu.r.c, emulator.cpu.r.d, emulator.cpu.r.e, emulator.cpu.r.h, emulator.cpu.r.l, emulator.cpu.r.sp, emulator.cpu.r.pc, emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
 				if (debug) {
@@ -375,10 +389,10 @@ int main(int argc, char *argv[]) {
 					printf("HL:  0x%02X %02X\n", emulator.cpu.r.h, emulator.cpu.r.l);
 					printf("\n");
 					printf("Flags\n");
-					printf("Zero:  %d\n", (emulator.cpu.r.f&0x80)>>7);
-					printf("Subtract:  %d\n", (emulator.cpu.r.f&0x40)>>6);
-					printf("Half Carry:  %d\n", (emulator.cpu.r.f&0x20)>>5);
-					printf("Carry:  %d\n", (emulator.cpu.r.f&0x10)>>4);
+					printf("Zero:  %d\n", emulator.cpu.r.Z);
+					printf("Subtract:  %d\n", emulator.cpu.r.N);
+					printf("Half Carry:  %d\n", emulator.cpu.r.H);
+					printf("Carry:  %d\n", emulator.cpu.r.C);
 					printf("\n");
 					printf("PC:  0x%X\n", emulator.cpu.r.pc);
 					printf("SP:  0x%X\n", emulator.cpu.r.sp);
@@ -386,8 +400,8 @@ int main(int argc, char *argv[]) {
 					printf("IF:  %d\n", emulator.cpu.interruptRequests);
 					printf("IE:  %d\n", emulator.cpu.enabledInterrupts);
 					printf("\n");
-					printf("Data at PC:  0x%02X, 0x%02X, 0x%02X, 0x%02X\n", emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc+1), emulator.read8(emulator.cpu.r.pc+2), emulator.read8(emulator.cpu.r.pc+3));
-					printf("Data at SP:  0x%02X, 0x%02X, 0x%02X, 0x%02X\n", emulator.read8(emulator.cpu.r.sp), emulator.read8(emulator.cpu.r.sp+1), emulator.read8(emulator.cpu.r.sp+2), emulator.read8(emulator.cpu.r.sp+3));
+					printf("Data at PC:  0x%02X, 0x%02X, 0x%02X, 0x%02X\n", emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
+					printf("Data at SP:  0x%02X, 0x%02X, 0x%02X, 0x%02X\n", emulator.read8(emulator.cpu.r.sp), emulator.read8(emulator.cpu.r.sp + 1), emulator.read8(emulator.cpu.r.sp + 2), emulator.read8(emulator.cpu.r.sp + 3));
 					printf("\n");
 					printf("PPU Mode:  %d\n", emulator.ppu.mode);
 					printf("PPU Mode Cycle:  %d\n", emulator.ppu.modeCycle);
@@ -404,13 +418,6 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		// Convert framebuffer to screen colors
-		for (int i = 0; i < (160 * 144); i++) {
-			pixels[i] = colors[emulator.ppu.outputFramebuffer[i]];
-		}
-		glBindTexture(GL_TEXTURE_2D, lcdTexture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 160, 144, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, pixels);
-
 		/* Draw ImGui Stuff */
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
@@ -426,11 +433,13 @@ int main(int argc, char *argv[]) {
 		if (showNoBootrom)
 			noBootromWindow();
 
-		// Gameboy Screen
+		// Game Boy Screen
 		{
-			ImGui::Begin("Gameboy Screen");
+			ImGui::Begin("Game Boy Screen");
 
-			ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
+			ImGui::Text("%.1f FPS", io.Framerate);
+			glBindTexture(GL_TEXTURE_2D, lcdTexture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 160, 144, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, pixels);
 			ImGui::Image((void*)(intptr_t)lcdTexture, ImVec2(160*2, 144*2));
 
 			ImGui::End();
@@ -455,7 +464,7 @@ int main(int argc, char *argv[]) {
 			ImGui::SameLine();
 			ImGui::Text("counter = %d", counter);
 
-			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 			ImGui::End();
 
 			if (showAnotherWindow) {
@@ -476,8 +485,12 @@ int main(int argc, char *argv[]) {
 		SDL_GL_SwapWindow(window);
 
 		if (!unlockFramerate) {
-			while ((SDL_GetTicks() - frameStartTicks) <= ((1000 / 60) - 2));
+			if (syncToAudio) {
+				//SDL_Delay(1);
+			} else {
+				while ((SDL_GetTicks() - frameStartTicks) <= ((1000 / 60) - 2));
 				//sleep(1);
+			}
 		}
 	}
 
@@ -561,9 +574,32 @@ uint8_t serialReadCallback(uint16_t address) {
 	return 0xFF;
 }
 
+void vblankCallback() {
+	frameDone = true;
+	// Convert framebuffer to screen colors
+	for (int i = 0; i < (160 * 144); i++) {
+		pixels[i] = colors[emulator.ppu.outputFramebuffer[i]];
+	}
+}
+
+void audioCallback(void *userdata, uint8_t *stream, int len) {
+	if (!argRomGiven)
+		return;
+
+	while ((emulator.apu.sampleBufferIndex * sizeof(int16_t) * 2) < (long unsigned int)len) {
+		emulator.cpu.cycle();
+	}
+	sampleBufferCallback();
+	emulator.apu.sampleBufferIndex = 0;
+	
+	memcpy(stream, &emulator.apu.sampleBuffer, len);
+}
+
 void sampleBufferCallback() {
 	wavFileData.insert(wavFileData.end(), emulator.apu.sampleBuffer.begin(), emulator.apu.sampleBuffer.begin() + emulator.apu.sampleBufferIndex);
-	SDL_QueueAudio(audioDevice, &emulator.apu.sampleBuffer, emulator.apu.sampleBufferIndex * sizeof(int16_t));
+	if (!syncToAudio) {
+		SDL_QueueAudio(audioDevice, &emulator.apu.sampleBuffer, emulator.apu.sampleBufferIndex * sizeof(int16_t));
+	}
 }
 
 int loadRomFromFile() {

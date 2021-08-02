@@ -1,7 +1,7 @@
 
 #include "gameboy.hpp"
 
-Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t), void (*apuSampleBufferFull)()) : rom(*this), cpu(*this), ppu(*this), ram(*this), timer(*this), apu(*this, apuSampleBufferFull), joypadWrite(joypadWrite_), joypadRead(joypadRead_), serialWrite(serialWrite_), serialRead(serialRead_) {
+Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t), void (*ppuVblank)(), void (*apuSampleBufferFull)()) : rom(*this), cpu(*this), ppu(*this, ppuVblank), ram(*this), timer(*this), apu(*this, apuSampleBufferFull), joypadWrite(joypadWrite_), joypadRead(joypadRead_), serialWrite(serialWrite_), serialRead(serialRead_) {
 	reset();
 }
 

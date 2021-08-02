@@ -3,7 +3,7 @@
 
 #define BLOCKING_DISABLED 0
 
-GameboyPPU::GameboyPPU(Gameboy& bus_) : bus(bus_) {
+GameboyPPU::GameboyPPU(Gameboy& bus_, void (*drawFrame_)()) : bus(bus_), drawFrame(drawFrame_) {
 	// Clear the VRAM, OAM, and output buffer
 	memset(vram, 0, sizeof(vram));
 	memset(oam, 0, sizeof(oam));
@@ -204,7 +204,7 @@ void GameboyPPU::cycle() {
 				line = -1;
 				windowLineCounter = 0;
 				windowTriggeredThisFrame = false;
-				frameDone = true;
+				drawFrame();
 				setMode(PPU_OAM_TRANSFER);
 			}
 			break;
@@ -233,7 +233,7 @@ void GameboyPPU::write(uint16_t address, uint8_t value) {
 	case 0xFF40: // LCDC
 		if (!(value & 0x80) && lcdc.lcdEnable) { // When turning LCD off
 			line = 0;
-			frameDone = true;
+			drawFrame();
 			memset(outputFramebuffer, 0, sizeof(outputFramebuffer));
 			lcdc.value = value;
 			setMode(PPU_HBLANK);
