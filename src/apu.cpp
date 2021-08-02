@@ -90,7 +90,6 @@ void GameboyAPU::cycle() {
 				}
 			}
 			if (channel4.periodTimer) {
-				//printf("0x%02X\n", channel4.currentVolume);
 				if ((--channel4.periodTimer) == 0) {
 					channel4.periodTimer = channel4.envelopeSweepNum;
 					if (channel4.periodTimer == 0) {
@@ -168,7 +167,6 @@ void GameboyAPU::cycle() {
 		// Send samples to device
 		if (sampleBufferIndex >= 2048) {
 			sampleBufferFull();
-			sampleBufferIndex = 0;
 		}
 	}
 

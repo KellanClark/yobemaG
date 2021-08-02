@@ -83,6 +83,7 @@ void noBootromWindow();
 
 // Everything else
 bool frameDone;
+bool running = false;
 int loadRomFromFile();
 void vblankCallback();
 
@@ -98,9 +99,9 @@ int main(int argc, char *argv[]) {
 	argBootromFilePath = "";
 	argSystem = SYSTEM_DEFAULT;
 	argMbc = DEFAULT_MBC;
-	argLogConsole = false;
 	syncToAudio = true;
 	unlockFramerate = false;
+	argLogConsole = false;
 	for (int i = 1; i < argc; i++) {
 		switch (cexprHash(argv[i])) {
 		case cexprHash("--rom"):
@@ -176,11 +177,14 @@ int main(int argc, char *argv[]) {
 				return -1;
 			}
 			break;
-		case cexprHash("--log-to-console"):
-			argLogConsole = true;
+		case cexprHash("--sync-to-video"): // TODO: Eventually add GUI option for this.
+			syncToAudio = false;
 			break;
 		case cexprHash("--unlock-framerate"):
 			unlockFramerate = true;
+			break;
+		case cexprHash("--log-to-console"):
+			argLogConsole = true;
 			break;
 		default:
 			if (i == 1) {
@@ -192,6 +196,8 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	}
+	if (unlockFramerate && syncToAudio)
+		printf("Warning: Using --unlock-framerate will only have an effect if paired with --sync-to-video\n");
 
 	if (argRomGiven) {
 		if (loadRomFromFile() == -1) {
@@ -247,14 +253,11 @@ int main(int argc, char *argv[]) {
 		.callback = NULL,
 		.userdata = NULL
 	};
-	if (syncToAudio) {
-		desiredAudioSpec.samples  = 512;
+	if (syncToAudio)
 		desiredAudioSpec.callback = audioCallback;
-	}
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredAudioSpec, &audioSpec, 0);
 	SDL_PauseAudioDevice(audioDevice, 0);
 	emulator.apu.sampleRate = audioSpec.freq;
-	printf("%d\n", audioSpec.silence);
 
 	// Setup ImGui
 	IMGUI_CHECKVERSION();
@@ -377,7 +380,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		frameDone = false;
-		if (argRomGiven && !waitingForBootrom && !syncToAudio) {
+		if (running && !syncToAudio) {
 			while (!frameDone) {
 				if (argLogConsole)
 					printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n", emulator.cpu.r.a, emulator.cpu.r.f, emulator.cpu.r.b, emulator.cpu.r.c, emulator.cpu.r.d, emulator.cpu.r.e, emulator.cpu.r.h, emulator.cpu.r.l, emulator.cpu.r.sp, emulator.cpu.r.pc, emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
@@ -583,31 +586,34 @@ void vblankCallback() {
 }
 
 void audioCallback(void *userdata, uint8_t *stream, int len) {
-	if (!argRomGiven)
+	if (!running)
 		return;
 
-	while ((emulator.apu.sampleBufferIndex * sizeof(int16_t) * 2) < (long unsigned int)len) {
+	while ((emulator.apu.sampleBufferIndex * sizeof(int16_t)) < (long unsigned int)len) {
 		emulator.cpu.cycle();
 	}
-	sampleBufferCallback();
+	wavFileData.insert(wavFileData.end(), emulator.apu.sampleBuffer.begin(), emulator.apu.sampleBuffer.begin() + emulator.apu.sampleBufferIndex);
 	emulator.apu.sampleBufferIndex = 0;
 	
 	memcpy(stream, &emulator.apu.sampleBuffer, len);
 }
 
 void sampleBufferCallback() {
-	wavFileData.insert(wavFileData.end(), emulator.apu.sampleBuffer.begin(), emulator.apu.sampleBuffer.begin() + emulator.apu.sampleBufferIndex);
 	if (!syncToAudio) {
+		wavFileData.insert(wavFileData.end(), emulator.apu.sampleBuffer.begin(), emulator.apu.sampleBuffer.begin() + emulator.apu.sampleBufferIndex);
 		SDL_QueueAudio(audioDevice, &emulator.apu.sampleBuffer, emulator.apu.sampleBufferIndex * sizeof(int16_t));
+		emulator.apu.sampleBufferIndex = 0;
 	}
 }
 
 int loadRomFromFile() {
+	running = false;
 	emulator.reset();
 
 	if (emulator.rom.load(argRomFilePath, argBootromFilePath, argSystem, argMbc))
 		return -1;
 
+	running = true;
 	return 0;
 }
 
