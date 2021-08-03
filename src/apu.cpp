@@ -54,6 +54,13 @@ void GameboyAPU::cycle() {
 						}
 					}
 				}
+				if (channel3.consecutiveSelection) {
+					if (channel3.lengthCounter) {
+						if ((--channel3.lengthCounter) == 0) {
+							soundControl.ch3On = false;
+						}
+					}
+				}
 				if (channel4.consecutiveSelection) {
 					if (channel4.lengthCounter) {
 						if ((--channel4.lengthCounter) == 0) {
@@ -133,6 +140,15 @@ void GameboyAPU::cycle() {
 			channel2.frequencyTimer = (2048 - ((channel2.frequencyHighBits << 8) | channel2.frequencyLowBits)) * 4;
 			channel2.waveIndex = (channel2.waveIndex + 1) & 7;
 		}
+		if (--channel3.frequencyTimer <= 0) {
+			channel3.frequencyTimer = (2048 - ((channel3.frequencyHighBits << 8) | channel3.frequencyLowBits)) * 4;
+			#ifdef CURSED_WAVE_RAM
+			channel3.waveMemIndex = (channel3.waveMemIndex - 1) & 0x1F;
+			channel3.waveMemShiftNo = channel3.waveMemIndex * 4;
+			#else
+			channel3.waveMemIndex = (channel3.waveMemIndex + 1) & 0x1F;
+			#endif
+		}
 		if (--channel4.frequencyTimer <= 0) {
 			if (channel4.divideRatio) {
 				channel4.frequencyTimer = channel4.divideRatio << (channel4.shiftClockFrequency + 4);
@@ -151,10 +167,14 @@ void GameboyAPU::cycle() {
 			sampleCounter -= 4194304;
 
 			// Sample each channel
-			float ch1Sample = soundControl.ch1On * ((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) / 7.5) - 1.0f;
-			float ch2Sample = soundControl.ch2On * ((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) / 7.5) - 1.0f;
-			float ch3Sample = soundControl.ch3On * 0;
-			float ch4Sample = soundControl.ch4On * ((channel4.currentVolume * ((~channel4.lfsr) & 1)) / 7.5) - 1.0f;
+			float ch1Sample = 0;//soundControl.ch1On * ((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) / 7.5) - 1.0f;
+			float ch2Sample = 0;//soundControl.ch2On * ((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) / 7.5) - 1.0f;
+			#ifdef CURSED_WAVE_RAM
+			float ch3Sample = soundControl.ch3On * ((((channel3.waveMemInt & (0xF << channel3.waveMemShiftNo)) >> channel3.waveMemShiftNo) >> (channel3.volume ? (channel3.volume - 1) : 4)) / 7.5) - 1.0f;
+			#else
+			float ch3Sample = soundControl.ch3On * ((channel3.waveMem[channel3.waveMemIndex] >> (channel3.volume ? (channel3.volume - 1) : 4)) / 7.5) - 1.0f;
+			#endif
+			float ch4Sample = 0;//soundControl.ch4On * ((channel4.currentVolume * ((~channel4.lfsr) & 1)) / 7.5) - 1.0f;
 
 			// Mix and put samples into buffers
 			if (soundControl.allOn) {
@@ -226,8 +246,29 @@ void GameboyAPU::write(uint16_t address, uint8_t value) {
 			soundControl.ch2On = true;
 		}
 		return;
+	case 0xFF1A: // NR30
+		channel3.NR30 = value;
+		return;
+	case 0xFF1B: // NR31
+		channel3.NR31 = value;
+		channel3.lengthCounter = 256 - channel3.soundLength;
+		return;
+	case 0xFF1C: // NR32
+		channel3.NR32 = value;
+		return;
+	case 0xFF1D: // NR33
+		channel3.NR33 = value;
+		return;
+	case 0xFF1E: // NR34
+		channel3.NR34 = value;
+		if (value & 0x80) {
+			if (!channel3.lengthCounter)
+				channel3.lengthCounter = 256;
+			soundControl.ch3On = true;
+		}
+		return;
 	case 0xFF20: // NR41
-		channel4.NR41 = value & 0x3F;
+		channel4.NR41 = value;
 		channel4.lengthCounter = 64 - channel4.soundLength;
 		return;
 	case 0xFF21: // NR42
@@ -237,7 +278,7 @@ void GameboyAPU::write(uint16_t address, uint8_t value) {
 		channel4.NR43 = value;
 		return;
 	case 0xFF23: // NR44
-		channel4.NR44 = value & 0xC0;
+		channel4.NR44 = value;
 		if (value & 0x80) {
 			channel4.lfsr = 0xFFFF;
 			if (!channel4.lengthCounter)
@@ -257,6 +298,14 @@ void GameboyAPU::write(uint16_t address, uint8_t value) {
 		return;
 	case 0xFF26: // NR52
 		soundControl.NR52 = value & 0x80;
+		return;
+	case 0xFF30 ... 0xFF3F: // Wave RAM
+		#ifdef CURSED_WAVE_RAM
+		channel3.waveMemArray[0xF - (address & 0xF)] = value;
+		#else
+		channel3.waveMem[(address & 0xF) << 1] = value >> 4;
+		channel3.waveMem[((address & 0xF) << 1) + 1] = value & 0xF;
+		#endif
 		return;
 	default:
 		return;
@@ -283,6 +332,16 @@ uint8_t GameboyAPU::read(uint16_t address) {
 		return 0xFF;
 	case 0xFF19: // NR24
 		return channel2.NR24 | 0xBF;
+	case 0xFF1A: // NR30
+		return channel3.NR30 | 0x7F;
+	case 0xFF1B: // NR31
+		return channel3.NR31;
+	case 0xFF1C: // NR32
+		return channel3.NR32 | 0x9F;
+	case 0xFF1D: // NR33
+		return 0xFF;
+	case 0xFF1E: // NR34
+		return channel3.NR34 | 0xBF;
 	case 0xFF20: // NR41
 		return channel4.NR41 | 0xC0;
 	case 0xFF21: // NR42
@@ -297,6 +356,12 @@ uint8_t GameboyAPU::read(uint16_t address) {
 		return soundControl.NR51;
 	case 0xFF26: // NR52
 		return soundControl.NR52 | 0x70;
+	case 0xFF30 ... 0xFF3F: // Wave RAM
+		#ifdef CURSED_WAVE_RAM
+		return channel3.waveMemArray[0xF - (address & 0xF)];
+		#else
+		return (channel3.waveMem[(address & 0xF) << 1] << 4) | channel3.waveMem[((address & 0xF) << 1) + 1];
+		#endif
 	default:
 		return 0xFF;
 	}

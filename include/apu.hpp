@@ -1,6 +1,8 @@
 #ifndef GBAPU_HPP
 #define GBAPU_HPP
 
+//#define CURSED_WAVE_RAM
+
 class Gameboy;
 class GameboyAPU {
 public:
@@ -107,7 +109,7 @@ public:
 		union {
 			struct {
 				uint8_t : 7;
-				uint8_t channelOff : 1;
+				uint8_t channelOn : 1;
 			};
 			uint8_t NR30;
 		};				// 0xFF1A
@@ -136,7 +138,18 @@ public:
 			};
 			uint8_t NR34;
 		};				// 0xFF1E
-		uint8_t waveMem[16]; // 0xFF30 - 0xFF3F
+		#ifdef CURSED_WAVE_RAM
+		union {
+			__uint128_t waveMemInt;
+			uint8_t waveMemArray[16];
+		}; // 0xFF30 - 0xFF3F
+		unsigned int waveMemShiftNo;
+		#else
+		uint8_t waveMem[32]; // 0xFF30 - 0xFF3F
+		#endif
+		unsigned int waveMemIndex;
+		int frequencyTimer;
+		int lengthCounter;
 	} channel3;
 	struct {
 		union {
