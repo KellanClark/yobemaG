@@ -52,6 +52,7 @@ public:
 	std::filesystem::path saveFilePath;
 
 	// MBC variables
+	enum gbMbcType mbc;
 	int selectedROMBank;
 	int selectedROMBankUpperBits;
 	int selectedExtRAMBank;
@@ -60,7 +61,7 @@ public:
 
 	// Information about the rom
 	std::string name;
-	enum gbMbcType mbc;
+	enum gbMbcType nativeMbc;
 	bool dmgSupported;
 	bool cgbSupported;
 	bool sgbSupported;

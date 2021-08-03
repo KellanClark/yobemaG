@@ -33,7 +33,7 @@ void GameboyPPU::cycle() {
 		return;
 
 	// Run 4 times because this is based on T Cycles
-	for (int i = 0; i < 4; i++) {
+	for (int t = 0; t < 4; t++) {
 		// Have each mode do its thing
 		switch (mode) {
 		case PPU_OAM_TRANSFER: // OAM Search

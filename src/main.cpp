@@ -80,6 +80,8 @@ void romInfoWindow();
 bool waitingForBootrom;
 bool showNoBootrom;
 void noBootromWindow();
+bool showMbcChangeWarning;
+void mbcChangeWarningWindow();
 
 // Everything else
 bool frameDone;
@@ -435,6 +437,8 @@ int main(int argc, char *argv[]) {
 			romInfoWindow();
 		if (showNoBootrom)
 			noBootromWindow();
+		if (showMbcChangeWarning)
+			mbcChangeWarningWindow();
 
 		// Game Boy Screen
 		{
@@ -699,7 +703,7 @@ void mainMenuBar() {
 			if (ImGui::Selectable("MBC7", emulator.rom.mbc == MBC_7)) argMbc = MBC_7;
 			if (ImGui::Selectable("Wisdom Tree", emulator.rom.mbc == WISDOM_TREE)) argMbc = WISDOM_TREE;
 			if ((emulator.rom.mbc != argMbc) && (argMbc != DEFAULT_MBC))
-				loadRomFromFile();
+				showMbcChangeWarning = true;
 
 			ImGui::EndMenu();
 		}
@@ -714,7 +718,7 @@ void romInfoWindow() {
 	ImGui::Begin("ROM Info", &showRomInfo);
 
 	std::string mbcString;
-	switch (emulator.rom.mbc) {
+	switch (emulator.rom.nativeMbc) {
 	case NO_MBC:mbcString = "None";break;
 	case MBC_1:mbcString = "MBC1";break;
 	case MBC_2:mbcString = "MBC2";break;
@@ -772,11 +776,13 @@ void mbcChangeWarningWindow() {
 	ImGui::Text("Warning! Changing the MBC to one not specified by the cartridge may have unexpected results.");
 
 	if (ImGui::Button("Cancel")) {
-		//
+		showMbcChangeWarning = false;
+		argMbc = emulator.rom.mbc;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Continue")) {
-		//
+		showMbcChangeWarning = false;
+		loadRomFromFile();
 	}
 
 	ImGui::End();

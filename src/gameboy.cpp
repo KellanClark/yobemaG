@@ -19,9 +19,7 @@ void Gameboy::reset() {
 
 void Gameboy::cycleSystem() {
 	timer.cycle();
-	for (int i = 0; i < 4; i++) {
-		apu.cycle();
-	}
+	apu.cycle();
 	ppu.cycle();
 	if (dmaCyclesLeft)
 		--dmaCyclesLeft;

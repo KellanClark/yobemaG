@@ -5,7 +5,7 @@ Game Boy spelled backwards because that makes about as much sense as my code. A 
 * Full CPU implementation
 * Passes the Acid2 test
 * Partial timer support
-* Full MBC1, full MBC2, much of MBC3, and full MBC5 minus rumble
+* MBC1, MBC2, MBC3 minus RTC, MBC5 minus rumble, and Wisdom Tree
 * Not much else yet. If you were expecting anything I write to be even remotely good/useful, I have some bad news.
 
 ## Requirements

@@ -154,76 +154,78 @@ int GameboyCartridge::load(std::filesystem::path romFilePath_, std::filesystem::
 	rtcEnabled=false;
 	switch (romBuff[0x0147]) {
 		case 0x00:
-			mbc = NO_MBC;
+			nativeMbc = NO_MBC;
 			break;
 		case 0x03:
 			saveBatteryEnabled = true;
 		case 0x02:
 		case 0x01:
-			mbc = MBC_1;
+			nativeMbc = MBC_1;
 			break;
 		case 0x05:
-			mbc = MBC_2;
+			nativeMbc = MBC_2;
 			break;
 		case 0x06:
-			mbc = MBC_2;
+			nativeMbc = MBC_2;
 			saveBatteryEnabled = true;
 			break;
 		case 0x0B:
-			mbc = MMM01;
+			nativeMbc = MMM01;
 			break;
 		case 0x0C:
-			mbc = MMM01;
+			nativeMbc = MMM01;
 			break;
 		case 0x0D:
-			mbc = MMM01;
+			nativeMbc = MMM01;
 			saveBatteryEnabled = true;
 			break;
 		case 0x0F:
-			mbc = MBC_3;
+			nativeMbc = MBC_3;
 			saveBatteryEnabled = true;
 			rtcEnabled = true;
 			break;
 		case 0x10:
-			mbc = MBC_3;
+			nativeMbc = MBC_3;
 			saveBatteryEnabled = true;
 			rtcEnabled = true;
 			break;
 		case 0x11:
-			mbc = MBC_3;
+			nativeMbc = MBC_3;
 			break;
 		case 0x12:
-			mbc = MBC_3;
+			nativeMbc = MBC_3;
 			break;
 		case 0x13:
-			mbc = MBC_3;
+			nativeMbc = MBC_3;
 			saveBatteryEnabled = true;
 			break;
 		case 0x19:
-			mbc = MBC_5;
+			nativeMbc = MBC_5;
 			break;
 		case 0x1A:
-			mbc = MBC_5;
+			nativeMbc = MBC_5;
 			break;
 		case 0x1B:
-			mbc = MBC_5;
+			nativeMbc = MBC_5;
 			break;
 		// TODO: Codes 1C 1D 1E
 		case 0x20:
-			mbc = MBC_6;
+			nativeMbc = MBC_6;
 			break;
 		// TODO: Codes 22 FC FD FE FF
 		default:
-			mbc = NO_MBC;
+			nativeMbc = NO_MBC;
 			printf("Unknown MBC Value: 0x%02X\n", romBuff[0x0147]);
 			printf("No MBC is assumed\n");
 			break;
 	}
 	if ((romBuff[0x0147] == 0xC0) && (romBuff[0x014A] == 0xD1))
-		mbc = WISDOM_TREE;
-	if (requestedMbc != DEFAULT_MBC)
+		nativeMbc = WISDOM_TREE;
+	if (requestedMbc == DEFAULT_MBC) {
+		mbc = nativeMbc;
+	} else {
 		mbc = requestedMbc;
-	
+	}
 	if (mbc == WISDOM_TREE)
 		selectedROMBank = 0;
 
