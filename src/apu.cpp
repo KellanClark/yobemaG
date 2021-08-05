@@ -141,7 +141,7 @@ void GameboyAPU::cycle() {
 			channel2.waveIndex = (channel2.waveIndex + 1) & 7;
 		}
 		if (--channel3.frequencyTimer <= 0) {
-			channel3.frequencyTimer = (2048 - ((channel3.frequencyHighBits << 8) | channel3.frequencyLowBits)) * 4;
+			channel3.frequencyTimer = (2048 - ((channel3.frequencyHighBits << 8) | channel3.frequencyLowBits)) * 2;
 			#ifdef CURSED_WAVE_RAM
 			channel3.waveMemIndex = (channel3.waveMemIndex - 1) & 0x1F;
 			channel3.waveMemShiftNo = channel3.waveMemIndex * 4;
@@ -167,14 +167,14 @@ void GameboyAPU::cycle() {
 			sampleCounter -= 4194304;
 
 			// Sample each channel
-			float ch1Sample = 0;//soundControl.ch1On * ((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) / 7.5) - 1.0f;
-			float ch2Sample = 0;//soundControl.ch2On * ((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) / 7.5) - 1.0f;
+			float ch1Sample = soundControl.ch1On * ((channel1.currentVolume * squareWaveDutyCycles[channel1.waveDuty][channel1.waveIndex]) / 7.5) - 1.0f;
+			float ch2Sample = soundControl.ch2On * ((channel2.currentVolume * squareWaveDutyCycles[channel2.waveDuty][channel2.waveIndex]) / 7.5) - 1.0f;
 			#ifdef CURSED_WAVE_RAM
-			float ch3Sample = soundControl.ch3On * ((((channel3.waveMemInt & (0xF << channel3.waveMemShiftNo)) >> channel3.waveMemShiftNo) >> (channel3.volume ? (channel3.volume - 1) : 4)) / 7.5) - 1.0f;
+			float ch3Sample = soundControl.ch3On * ((((channel3.waveMemInt & ((__uint128_t)0xF << channel3.waveMemShiftNo)) >> channel3.waveMemShiftNo) >> (channel3.volume ? (channel3.volume - 1) : 4)) / 7.5) - 1.0f;
 			#else
 			float ch3Sample = soundControl.ch3On * ((channel3.waveMem[channel3.waveMemIndex] >> (channel3.volume ? (channel3.volume - 1) : 4)) / 7.5) - 1.0f;
 			#endif
-			float ch4Sample = 0;//soundControl.ch4On * ((channel4.currentVolume * ((~channel4.lfsr) & 1)) / 7.5) - 1.0f;
+			float ch4Sample = soundControl.ch4On * ((channel4.currentVolume * ((~channel4.lfsr) & 1)) / 7.5) - 1.0f;
 
 			// Mix and put samples into buffers
 			if (soundControl.allOn) {
