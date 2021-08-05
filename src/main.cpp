@@ -43,12 +43,6 @@ uint8_t joypadDirectionSelect;
 void joypadWriteCallback(uint8_t value);
 uint8_t joypadReadCallback();
 
-// Serial stuff
-uint8_t serialData;
-uint8_t serialControl;
-void serialWriteCallback(uint16_t address, uint8_t value);
-uint8_t serialReadCallback(uint16_t address);
-
 // Audio stuff
 bool syncToAudio;
 SDL_AudioSpec desiredAudioSpec, audioSpec;
@@ -77,7 +71,6 @@ GLuint lcdTexture;
 void mainMenuBar();
 bool showRomInfo;
 void romInfoWindow();
-bool waitingForBootrom;
 bool showNoBootrom;
 void noBootromWindow();
 bool showMbcChangeWarning;
@@ -90,7 +83,6 @@ int loadRomFromFile();
 void vblankCallback();
 
 Gameboy emulator(&joypadWriteCallback, &joypadReadCallback,
-				&serialWriteCallback, &serialReadCallback,
 				&vblankCallback,
 				&sampleBufferCallback);
 
@@ -207,11 +199,6 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	// Initalize some values
-	serialData = 0;
-	serialControl = 0;
-	joypadButtons.value = 0xFF;
-
 	/* Temporary hex viewer
 	for (int i = 0; i < 0x400; i += 16) {
 		printf("%04X: ", i);
@@ -290,6 +277,7 @@ int main(int argc, char *argv[]) {
 	memset(emulator.ppu.outputFramebuffer, 0, sizeof(emulator.ppu.outputFramebuffer));
 
 	// Main loop
+	joypadButtons.value = 0xFF;
 	bool debug = false;
 	SDL_Event event;
 	bool done = false;
@@ -556,31 +544,6 @@ uint8_t joypadReadCallback() {
 	return returnValue;
 }
 
-// Temporary serial implementation for running blargg's tests
-void serialWriteCallback(uint16_t address, uint8_t value) {
-	return;
-
-	if (address == 0xFF01) {
-		serialData = value;
-		putchar(serialData);
-	}
-
-	if (address == 0xFF02)
-		serialControl = value;
-}
-
-uint8_t serialReadCallback(uint16_t address) {
-	return 0xFF;
-
-	if (address == 0xFF01)
-		return serialData;
-
-	if (address == 0xFF02)
-		return serialControl;
-
-	return 0xFF;
-}
-
 void vblankCallback() {
 	frameDone = true;
 	// Convert framebuffer to screen colors
@@ -633,7 +596,6 @@ void mainMenuBar() {
 				argRomGiven = true;
 				argRomFilePath = nfdRomFilePath.get();
 				if (!argBootromGiven) {
-					waitingForBootrom = true;
 					showNoBootrom = true;
 				} else {
 					loadRomFromFile();
@@ -650,7 +612,6 @@ void mainMenuBar() {
 			if (nfdResult == NFD_OKAY) {
 				argBootromGiven = true;
 				argBootromFilePath = nfdBootromFilePath.get();
-				waitingForBootrom = false;
 				showNoBootrom = false;
 				if (argRomGiven)
 					loadRomFromFile();
@@ -760,7 +721,6 @@ void noBootromWindow() {
 		showNoBootrom = false;
 	ImGui::SameLine();
 	if (ImGui::Button("Continue")) {
-		waitingForBootrom = false;
 		showNoBootrom = false;
 		loadRomFromFile();
 	}

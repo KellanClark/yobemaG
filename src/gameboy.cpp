@@ -1,7 +1,7 @@
 
 #include "gameboy.hpp"
 
-Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t), void (*ppuVblank)(), void (*apuSampleBufferFull)()) : rom(*this), cpu(*this), ppu(*this, ppuVblank), ram(*this), timer(*this), apu(*this, apuSampleBufferFull), joypadWrite(joypadWrite_), joypadRead(joypadRead_), serialWrite(serialWrite_), serialRead(serialRead_) {
+Gameboy::Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(), void (*ppuVblank)(), void (*apuSampleBufferFull)()) : rom(*this), cpu(*this), ppu(*this, ppuVblank), ram(*this), timer(*this), apu(*this, apuSampleBufferFull), joypadWrite(joypadWrite_), joypadRead(joypadRead_) {
 	reset();
 }
 
@@ -51,7 +51,6 @@ void Gameboy::write8(uint16_t address, uint8_t value) {
 		joypadWrite(value);
 		return;
 	case 0xFF01 ... 0xFF02: // Serial
-		serialWrite(address, value);
 		return;
 	case 0xFF04 ... 0xFF07: // Timer
 		timer.write(address, value);
@@ -110,7 +109,7 @@ uint8_t Gameboy::read8(uint16_t address) {
 	case 0xFF00: // Joypad
 		return joypadRead();
 	case 0xFF01 ... 0xFF02: // Serial
-		return serialRead(address);
+		return 0xFF;
 	case 0xFF04 ... 0xFF07: // Timer
 		return timer.read(address);
 	case 0xFF0F:

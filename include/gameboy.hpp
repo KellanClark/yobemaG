@@ -41,7 +41,6 @@ public:
 	GameboyAPU apu;
 
 	Gameboy(void (*joypadWrite_)(uint8_t), uint8_t (*joypadRead_)(),
-			void (*serialWrite_)(uint16_t, uint8_t), uint8_t (*serialRead_)(uint16_t),
 			void (*ppuVblank)(),
 			void (*apuSampleBufferFull)());
 	void reset();
@@ -60,8 +59,6 @@ public:
 	// Callback functions because some things rely too much on the platform
 	void (*joypadWrite)(uint8_t value);
 	uint8_t (*joypadRead)();
-	void (*serialWrite)(uint16_t address, uint8_t value);
-	uint8_t (*serialRead)(uint16_t address);
 
 	systemType system;
 	dmaStates oamDMAState;
