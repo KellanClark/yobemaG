@@ -76,10 +76,13 @@ void noBootromWindow();
 bool showMbcChangeWarning;
 void mbcChangeWarningWindow();
 
+void romFileDialog();
+void bootromFileDialog();
+
 // Everything else
 bool frameDone;
 bool running = false;
-int loadRomFromFile();
+int loadRom();
 void vblankCallback();
 
 Gameboy emulator(&joypadWriteCallback, &joypadReadCallback,
@@ -194,7 +197,7 @@ int main(int argc, char *argv[]) {
 		printf("Warning: Using --unlock-framerate will only have an effect if paired with --sync-to-video\n");
 
 	if (argRomGiven) {
-		if (loadRomFromFile() == -1) {
+		if (loadRom() == -1) {
 			return -1;
 		}
 	}
@@ -296,47 +299,59 @@ int main(int argc, char *argv[]) {
 				done = true;
 				break;
 			case SDL_KEYDOWN:
-				directionButtonPressed = false;
-				actionButtonPressed = false;
-				switch (event.key.keysym.sym) {
-				case SDLK_s:
-					emulator.rom.save();
-					break;
-				case SDLK_RIGHT:
-					joypadButtons.right = 0;
-					directionButtonPressed = true;
-					break;
-				case SDLK_LEFT:
-					joypadButtons.left = 0;
-					directionButtonPressed = true;
-					break;
-				case SDLK_UP:
-					joypadButtons.up = 0;
-					directionButtonPressed = true;
-					break;
-				case SDLK_DOWN:
-					joypadButtons.down = 0;
-					directionButtonPressed = true;
-					break;
-				case SDLK_z:
-					joypadButtons.b = 0;
-					actionButtonPressed = true;
-					break;
-				case SDLK_x:
-					joypadButtons.a = 0;
-					actionButtonPressed = true;
-					break;
-				case SDLK_n:
-					joypadButtons.select = 0;
-					actionButtonPressed = true;
-					break;
-				case SDLK_m:
-					joypadButtons.start = 0;
-					actionButtonPressed = true;
-					break;
+				if (event.key.keysym.mod & KMOD_CTRL) {
+					switch (event.key.keysym.sym) {
+					case SDLK_s:
+						emulator.rom.save();
+						break;
+					case SDLK_o:
+						if (event.key.keysym.mod & KMOD_SHIFT) {
+							bootromFileDialog();
+						} else {
+							romFileDialog();
+						}
+						break;
+					}
+				} else {
+					directionButtonPressed = false;
+					actionButtonPressed = false;
+					switch (event.key.keysym.sym) {
+					case SDLK_RIGHT:
+						joypadButtons.right = 0;
+						directionButtonPressed = true;
+						break;
+					case SDLK_LEFT:
+						joypadButtons.left = 0;
+						directionButtonPressed = true;
+						break;
+					case SDLK_UP:
+						joypadButtons.up = 0;
+						directionButtonPressed = true;
+						break;
+					case SDLK_DOWN:
+						joypadButtons.down = 0;
+						directionButtonPressed = true;
+						break;
+					case SDLK_z:
+						joypadButtons.b = 0;
+						actionButtonPressed = true;
+						break;
+					case SDLK_x:
+						joypadButtons.a = 0;
+						actionButtonPressed = true;
+						break;
+					case SDLK_n:
+						joypadButtons.select = 0;
+						actionButtonPressed = true;
+						break;
+					case SDLK_m:
+						joypadButtons.start = 0;
+						actionButtonPressed = true;
+						break;
+					}
+					if ((directionButtonPressed && !joypadDirectionSelect) || (actionButtonPressed && !joypadActionSelect))
+						emulator.cpu.requestInterrupt(INT_JOYPAD);
 				}
-				if ((directionButtonPressed && !joypadDirectionSelect) || (actionButtonPressed && !joypadActionSelect))
-					emulator.cpu.requestInterrupt(INT_JOYPAD);
 				break;
 			case SDL_KEYUP:
 				switch (event.key.keysym.sym) {
@@ -573,7 +588,7 @@ void sampleBufferCallback() {
 	}
 }
 
-int loadRomFromFile() {
+int loadRom() {
 	running = false;
 	emulator.reset();
 
@@ -588,39 +603,15 @@ void mainMenuBar() {
 	ImGui::BeginMainMenuBar();
 
 	if (ImGui::BeginMenu("File")) {
-		if (ImGui::MenuItem("Load ROM")) {
-			nfdfilteritem_t filter[1] = {{"Game Boy/Game Boy Color ROM", "gb,gbc,bin"}};
-			NFD::UniquePath nfdRomFilePath;
-			nfdresult_t nfdResult = NFD::OpenDialog(nfdRomFilePath, filter, 1);
-			if (nfdResult == NFD_OKAY) {
-				argRomGiven = true;
-				argRomFilePath = nfdRomFilePath.get();
-				if (!argBootromGiven) {
-					showNoBootrom = true;
-				} else {
-					loadRomFromFile();
-				}
-			} else if (nfdResult != NFD_CANCEL) {
-				printf("Error: %s\n", NFD::GetError());
-			}
+		if (ImGui::MenuItem("Load ROM", "Ctrl+O")) {
+			romFileDialog();
 		}
 
-		if (ImGui::MenuItem("Load BootROM")) {
-			nfdfilteritem_t filter[1] = {{"Game Boy/Game Boy Color BootROM", "bin"}};
-			NFD::UniquePath nfdBootromFilePath;
-			nfdresult_t nfdResult = NFD::OpenDialog(nfdBootromFilePath, filter, 1);
-			if (nfdResult == NFD_OKAY) {
-				argBootromGiven = true;
-				argBootromFilePath = nfdBootromFilePath.get();
-				showNoBootrom = false;
-				if (argRomGiven)
-					loadRomFromFile();
-			} else if (nfdResult != NFD_CANCEL) {
-				printf("Error: %s\n", NFD::GetError());
-			}
+		if (ImGui::MenuItem("Load BootROM", "Ctrl+Shift+O")) {
+			bootromFileDialog();
 		}
 
-		if (ImGui::MenuItem("Save", NULL, false, emulator.rom.saveBatteryEnabled)) {
+		if (ImGui::MenuItem("Save", "Ctrl+S", false, emulator.rom.saveBatteryEnabled)) {
 			emulator.rom.save();
 		}
 
@@ -636,23 +627,23 @@ void mainMenuBar() {
 		if (ImGui::BeginMenu("System")) {
 			if (ImGui::Selectable("Default", argSystem == SYSTEM_DEFAULT) && argSystem != SYSTEM_DEFAULT) {
 				argSystem = SYSTEM_DEFAULT;
-				loadRomFromFile();
+				loadRom();
 			}
 			ImGui::Separator();
-			if (ImGui::Selectable("Game Boy (DMG)", argSystem == SYSTEM_DMG) && argSystem != SYSTEM_DMG) {
+			if (ImGui::Selectable("Game Boy (DMG)", emulator.system == SYSTEM_DMG) && emulator.system != SYSTEM_DMG) {
 				argSystem = SYSTEM_DMG;
-				loadRomFromFile();
+				loadRom();
 			}
-			if (ImGui::Selectable("Game Boy Color (CGB)", argSystem == SYSTEM_CGB) && argSystem != SYSTEM_CGB) {
+			if (ImGui::Selectable("Game Boy Color (CGB)", emulator.system == SYSTEM_CGB) && emulator.system != SYSTEM_CGB) {
 				argSystem = SYSTEM_CGB;
-				loadRomFromFile();
+				loadRom();
 			}
 
 			ImGui::EndMenu();
 		}
 
 		if (ImGui::BeginMenu("Memory Bank Controller")) {
-			if (ImGui::Selectable("Default", argMbc == DEFAULT_MBC) && argMbc != DEFAULT_MBC) {argMbc = DEFAULT_MBC; loadRomFromFile();}
+			if (ImGui::Selectable("Default", argMbc == DEFAULT_MBC) && argMbc != DEFAULT_MBC) {argMbc = DEFAULT_MBC; loadRom();}
 			ImGui::Separator();
 			if (ImGui::Selectable("None", emulator.rom.mbc == NO_MBC)) argMbc = NO_MBC;
 			if (ImGui::Selectable("MBC1", emulator.rom.mbc == MBC_1)) argMbc = MBC_1;
@@ -722,7 +713,7 @@ void noBootromWindow() {
 	ImGui::SameLine();
 	if (ImGui::Button("Continue")) {
 		showNoBootrom = false;
-		loadRomFromFile();
+		loadRom();
 	}
 
 	ImGui::End();
@@ -742,8 +733,40 @@ void mbcChangeWarningWindow() {
 	ImGui::SameLine();
 	if (ImGui::Button("Continue")) {
 		showMbcChangeWarning = false;
-		loadRomFromFile();
+		loadRom();
 	}
 
 	ImGui::End();
+}
+
+void romFileDialog() {
+	nfdfilteritem_t filter[1] = {{"Game Boy/Game Boy Color ROM", "gb,gbc,bin"}};
+	NFD::UniquePath nfdRomFilePath;
+	nfdresult_t nfdResult = NFD::OpenDialog(nfdRomFilePath, filter, 1);
+	if (nfdResult == NFD_OKAY) {
+		argRomGiven = true;
+		argRomFilePath = nfdRomFilePath.get();
+		if (!argBootromGiven) {
+			showNoBootrom = true;
+		} else {
+			loadRom();
+		}
+	} else if (nfdResult != NFD_CANCEL) {
+		printf("Error: %s\n", NFD::GetError());
+	}
+}
+
+void bootromFileDialog() {
+	nfdfilteritem_t filter[1] = {{"Game Boy/Game Boy Color BootROM", "bin"}};
+	NFD::UniquePath nfdBootromFilePath;
+	nfdresult_t nfdResult = NFD::OpenDialog(nfdBootromFilePath, filter, 1);
+	if (nfdResult == NFD_OKAY) {
+		argBootromGiven = true;
+		argBootromFilePath = nfdBootromFilePath.get();
+		showNoBootrom = false;
+		if (argRomGiven)
+			loadRom();
+	} else if (nfdResult != NFD_CANCEL) {
+		printf("Error: %s\n", NFD::GetError());
+	}
 }
