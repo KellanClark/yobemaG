@@ -572,6 +572,8 @@ void audioCallback(void *userdata, uint8_t *stream, int len) {
 		return;
 
 	while ((emulator.apu.sampleBufferIndex * sizeof(int16_t)) < (long unsigned int)len) {
+		if (argLogConsole)
+			printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n", emulator.cpu.r.a, emulator.cpu.r.f, emulator.cpu.r.b, emulator.cpu.r.c, emulator.cpu.r.d, emulator.cpu.r.e, emulator.cpu.r.h, emulator.cpu.r.l, emulator.cpu.r.sp, emulator.cpu.r.pc, emulator.read8(emulator.cpu.r.pc), emulator.read8(emulator.cpu.r.pc + 1), emulator.read8(emulator.cpu.r.pc + 2), emulator.read8(emulator.cpu.r.pc + 3));
 		emulator.cpu.cycle();
 	}
 	wavFileData.insert(wavFileData.end(), emulator.apu.sampleBuffer.begin(), emulator.apu.sampleBuffer.begin() + emulator.apu.sampleBufferIndex);
@@ -663,6 +665,12 @@ void mainMenuBar() {
 		ImGui::EndMenu();
 	}
 
+	if (ImGui::BeginMenu("Debug")) {
+		ImGui::MenuItem("Palette");
+
+		ImGui::EndMenu();
+	}
+
 	ImGui::EndMainMenuBar();
 }
 
@@ -723,7 +731,6 @@ void mbcChangeWarningWindow() {
 	// Center window
 	ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5, 0.5));
 	ImGui::Begin("MBC Override");
-
 	ImGui::Text("Warning! Changing the MBC to one not specified by the cartridge may have unexpected results.");
 
 	if (ImGui::Button("Cancel")) {

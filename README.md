@@ -3,8 +3,9 @@ Game Boy spelled backwards because that makes about as much sense as my code. A 
 
 ## Features
 * Full CPU implementation
-* Passes the Acid2 test
-* Partial timer support
+* Working PPU with rudimentary time traveling for mid-scanline effects
+* Sound and ability to save all output to a `.wav` file
+* Timer
 * MBC1, MBC2, MBC3 minus RTC, MBC5 minus rumble, and Wisdom Tree
 * Not much else yet. If you were expecting anything I write to be even remotely good/useful, I have some bad news.
 

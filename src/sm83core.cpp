@@ -236,7 +236,7 @@ void SM83::executeOpcode() {
 	case 0xF1:
 		bus.cycleSystem();
 		bus.cycleSystem();
-		r.af = bus.pop16() | 0xF;
+		r.af = bus.pop16() & 0xFFF0;
 		return;
 	case 0xF2: // LD A, (FF00+C)
 		r.a = fetchByte(0xFF00 + r.c);

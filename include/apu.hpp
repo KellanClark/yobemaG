@@ -61,6 +61,7 @@ public:
 			};
 			uint8_t NR14;
 		};				// 0xFF14
+		bool dacOn;
 		int frequencyTimer;
 		unsigned int waveIndex;
 		bool sweepEnabled;
@@ -99,6 +100,7 @@ public:
 			};
 			uint8_t NR24;
 		};				// 0xFF19
+		bool dacOn;
 		int frequencyTimer;
 		unsigned int waveIndex;
 		int lengthCounter;
@@ -109,7 +111,7 @@ public:
 		union {
 			struct {
 				uint8_t : 7;
-				uint8_t channelOn : 1;
+				uint8_t dacOn : 1;
 			};
 			uint8_t NR30;
 		};				// 0xFF1A
@@ -183,6 +185,7 @@ public:
 			};
 			uint8_t NR44;
 		};				// 0xFF23
+		bool dacOn;
 		int frequencyTimer;
 		uint16_t lfsr;
 		int lengthCounter;
