@@ -156,7 +156,7 @@ void GameboyAPU::cycle() {
 				channel4.frequencyTimer = 8 << channel4.shiftClockFrequency;
 			}
 			int xorBit = (channel4.lfsr ^ (channel4.lfsr >> 1)) & 1;
-			channel4.lfsr = ((channel4.lfsr >> 1) & 0xBFFF) | (xorBit << 14);
+			channel4.lfsr = (channel4.lfsr >> 1) | (xorBit << 14);
 			if (channel4.counterWidth)
 				channel4.lfsr = (channel4.lfsr & 0xFFBF) | (xorBit << 6);
 		}
@@ -327,7 +327,7 @@ void GameboyAPU::write(uint16_t address, uint8_t value) {
 		return;
 	case 0xFF23: // NR44
 		if (value & 0x80) {
-			channel4.lfsr = 0xFFFF;
+			channel4.lfsr = 0x7FFF;
 			if (!channel4.lengthCounter)
 				channel4.lengthCounter = 64;
 			channel4.periodTimer = channel4.envelopeSweepNum;
